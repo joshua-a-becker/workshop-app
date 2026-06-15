@@ -1,0 +1,62 @@
+{
+  "type": "multiple_choice",
+  "roles": [
+    {
+      "role_name": "Candidate",
+      "narrative": "You've received a job offer you're excited about, and now it's time to negotiate the terms. Four issues are on the table: **salary**, **start date**, **annual leave**, and **remote work**. You care most about salary, but flexibility and time off matter to you too.\n\nFor each issue, pick the option that works best for you — but remember the employer has their own preferences, so you'll need to trade. Conceding on something you care little about (say, starting sooner) can win you something you value more (a higher salary). Higher value means a better deal for you.\n\nIf you can't reach an agreement worth more than 0 to you, you'll keep looking — you have other prospects.",
+      "BATNA": "Your best alternative is to continue your job search. Walking away is worth 0 value, so only accept a package worth more than 0.",
+      "RP": 0,
+      "scoresheet": {
+        "Salary": [
+          { "option": "$90,000", "score": 0, "reason": "Below market for your skills" },
+          { "option": "$110,000", "score": 4, "reason": "A solid, fair salary" },
+          { "option": "$130,000", "score": 8, "reason": "Excellent — well above your target" }
+        ],
+        "Start_Date": [
+          { "option": "Immediately", "score": 0, "reason": "No time to rest between jobs" },
+          { "option": "In 1 month", "score": 1, "reason": "A short, workable break" },
+          { "option": "In 3 months", "score": 2, "reason": "A proper break before starting" }
+        ],
+        "Annual_Leave": [
+          { "option": "2 weeks", "score": 0, "reason": "Less time off than you'd like" },
+          { "option": "3 weeks", "score": 2, "reason": "A comfortable amount of leave" },
+          { "option": "4 weeks", "score": 4, "reason": "Generous time off — a big plus" }
+        ],
+        "Remote_Days": [
+          { "option": "0 days / week", "score": 0, "reason": "Fully in-office, a long commute" },
+          { "option": "2 days / week", "score": 2, "reason": "A healthy hybrid balance" },
+          { "option": "4 days / week", "score": 4, "reason": "Mostly remote — ideal for you" }
+        ]
+      }
+    },
+    {
+      "role_name": "Employer",
+      "narrative": "You're hiring for a key role and have made an offer to a strong candidate. Now you're negotiating the terms across four issues: **salary**, **start date**, **annual leave**, and **remote work**. You want to control costs and get the person in the door quickly, but you also want them to accept.\n\nFor each issue, pick the option that's best for the company — but the candidate has their own priorities, so expect to trade. Giving ground on something cheap for you (say, more remote days) can let you hold the line on something costly (a lower salary). Higher value means a better deal for the company.\n\nIf you can't reach an agreement worth more than 0 to you, you'll reopen the search — you have other applicants.",
+      "BATNA": "Your best alternative is to reopen the search with other applicants. That is worth 0 value, so only accept a package worth more than 0.",
+      "RP": 0,
+      "scoresheet": {
+        "Salary": [
+          { "option": "$90,000", "score": 8, "reason": "Keeps costs well within budget" },
+          { "option": "$110,000", "score": 4, "reason": "An acceptable cost" },
+          { "option": "$130,000", "score": 0, "reason": "Stretches the budget to its limit" }
+        ],
+        "Start_Date": [
+          { "option": "Immediately", "score": 3, "reason": "The team needs help right away" },
+          { "option": "In 1 month", "score": 1, "reason": "A manageable wait" },
+          { "option": "In 3 months", "score": 0, "reason": "Leaves the role unfilled too long" }
+        ],
+        "Annual_Leave": [
+          { "option": "2 weeks", "score": 3, "reason": "Maximizes working days" },
+          { "option": "3 weeks", "score": 1, "reason": "Standard, acceptable leave" },
+          { "option": "4 weeks", "score": 0, "reason": "More time away from the desk" }
+        ],
+        "Remote_Days": [
+          { "option": "0 days / week", "score": 4, "reason": "Full in-office presence preferred" },
+          { "option": "2 days / week", "score": 2, "reason": "A workable hybrid arrangement" },
+          { "option": "4 days / week", "score": 0, "reason": "Little in-person collaboration" }
+        ]
+      }
+    }
+  ],
+  "tips": "<p class=\"text-gray-700 mb-4\">This is a <strong>multi-issue</strong> negotiation, which opens the door to <strong>integrative</strong> (\"win-win\") deals. The key insight: the issues are worth different amounts to each side.</p><p>Look for <strong>logrolling</strong> opportunities — trade away an issue you care little about in exchange for one you value highly. If start date matters more to one party and salary more to the other, each can concede on the cheap issue to gain on the expensive one, leaving both better off than a simple compromise on every issue.</p><p>Always keep your <strong>BATNA</strong> in mind: never accept a total package worth less than 0 to you. And don't just split every issue down the middle — find the trades that grow the total value for everyone.</p>"
+}

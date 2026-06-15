@@ -12,6 +12,7 @@ factors:
       values:
         - value: 100000
         - value: 30000
+        - value: 1800
         - value: 300
     - name: readRoleTime
       values:
@@ -25,17 +26,28 @@ factors:
       values:
         - value: https://raw.githubusercontent.com/joshua-a-becker/zopa-vs-complexity/refs/heads/main/server/src/roles_v1.json
         - value: https://raw.githubusercontent.com/joshua-a-becker/zopa-vs-complexity/refs/heads/main/roles_v1.json
+        - value: roles_features_example.json
+        - value: roles_multiplechoice_example.json
+        - value: roles_price_example.json
 treatments:
-    - name: trio_long
-      desc: three person negotiation
+    - name: features_example
+      desc: Two-party apartment lease, include/exclude features (local file)
       factors:
-        negotiateTime: 30000
-        playerCount: 3
-        readRoleTime: 30000
-    - name: trio
-      desc: three person negotiation
-      factors:
-        negotiateTime: 300
-        playerCount: 3
+        negotiateTime: 1800
+        playerCount: 2
         readRoleTime: 300
-        roleDataURL: https://raw.githubusercontent.com/joshua-a-becker/zopa-vs-complexity/refs/heads/main/roles_v1.json
+        roleDataURL: roles_features_example.json
+    - name: multiplechoice_example
+      desc: Two-party job offer, one dropdown per issue (local file)
+      factors:
+        negotiateTime: 1800
+        playerCount: 2
+        readRoleTime: 300
+        roleDataURL: roles_multiplechoice_example.json
+    - name: price_example
+      desc: Two-party used-car sale, single price box (local file)
+      factors:
+        negotiateTime: 1800
+        playerCount: 2
+        readRoleTime: 300
+        roleDataURL: roles_price_example.json

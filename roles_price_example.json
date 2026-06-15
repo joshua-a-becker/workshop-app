@@ -1,0 +1,27 @@
+{
+  "type": "price",
+  "price_config": {
+    "label": "Sale Price",
+    "prefix": "$",
+    "min": 0,
+    "step": 250,
+    "description": "Agree on a single sale price for the car."
+  },
+  "roles": [
+    {
+      "role_name": "Buyer",
+      "narrative": "You're shopping for a reliable used car and have found one you like. You've done your research: comparable cars sell for around **$18,000**, and your absolute maximum — given your budget and the value of your next-best option (a slightly worse car you've already been offered) — is **$20,000**. Every dollar below that is money in your pocket.\n\nYour goal is to agree on a price **at or below $20,000**. The lower the price, the better your outcome. You should never agree to pay more than $20,000, because at that point you're better off walking away to your alternative.",
+      "BATNA": "Your best alternative is a comparable car already offered to you for $20,000. So you should never pay more than $20,000 here.",
+      "multiplier": 1,
+      "rp": 20000
+    },
+    {
+      "role_name": "Seller",
+      "narrative": "You're selling your used car. You've owned it for a few years and want to get a fair price. You've worked out that the lowest price you'd accept — given the value to you of simply keeping the car, plus a private offer you already have in hand — is **$12,000**. Every dollar above that is profit for you.\n\nYour goal is to agree on a price **at or above $12,000**. The higher the price, the better your outcome. You should never agree to sell for less than $12,000, because at that point you're better off walking away.",
+      "BATNA": "Your best alternative is a standing private offer of $12,000. So you should never sell for less than $12,000 here.",
+      "multiplier": -1,
+      "rp": 12000
+    }
+  ],
+  "tips": "<p class=\"text-gray-700 mb-4\">In a single-issue price negotiation, the key concepts are your <strong>reservation price</strong> and the <strong>ZOPA</strong> (Zone of Possible Agreement).</p><p>Your <strong>reservation price</strong> is the worst price you'd still accept — the point where the deal is no better than your <strong>BATNA</strong> (Best Alternative to a Negotiated Agreement). A buyer should never pay more than their reservation price; a seller should never accept less than theirs.</p><p>The <strong>ZOPA</strong> is the range of prices acceptable to both sides — it exists only when the buyer's maximum is above the seller's minimum. Any price inside the ZOPA is better than no deal for both parties; how the surplus is split is what you're negotiating over.</p><p class=\"text-gray-700 mb-4\">The number one rule still holds: <strong>never accept a deal worse than your BATNA</strong>. Here, your \"value\" is your surplus relative to your reservation price, so never accept a deal worth less than 0.</p>"
+}

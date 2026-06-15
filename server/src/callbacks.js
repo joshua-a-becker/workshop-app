@@ -1,6 +1,8 @@
 import { ClassicListenersCollector } from "@empirica/core/admin/classic";
 import fetch from "node-fetch";
 import { execSync } from "child_process";
+import fs from "fs";
+import path from "path";
 
 // import rolesData from "./roles.json" assert { type: "json" };
 // const roles = rolesData.roles;
@@ -25,6 +27,42 @@ const ENABLE_AUTO_ASSIGNMENT = false; // Set to true to enable 6 PM auto-start
 // `Date.now() - lastSeen.ts > PRESENCE_STALE_MS`.
 const PRESENCE_STALE_MS = 5000;
 const PRESENCE_SWEEP_MS = 1000;
+// A freshly-assigned player needs several seconds to load the client and send
+// its first heartbeat (observed: 8-17s). Until they have heartbeated even once,
+// give them this longer grace before pruning, so they aren't swept out of the
+// lobby roster before their first `lastSeen` ever arrives.
+const NEW_JOINER_GRACE_MS = 30000;
+
+// Load role data from either a remote URL (http/https) or a local file path.
+// A local path is resolved against a few likely base directories so it works
+// whether the server is launched from the project root (via `empirica`) or from
+// the server/ directory (via `cd server && npm run dev`).
+function loadRoleData(source) {
+  if (/^https?:\/\//i.test(source)) {
+    return JSON.parse(execSync(`curl -s "${source}"`).toString());
+  }
+
+  const candidates = [
+    source,
+    path.resolve(process.cwd(), source),
+    path.resolve(process.cwd(), "..", source),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) {
+        console.log(`[ROLES] Loading role data from local file: ${candidate}`);
+        return JSON.parse(fs.readFileSync(candidate, "utf8"));
+      }
+    } catch (err) {
+      // try the next candidate
+    }
+  }
+
+  throw new Error(
+    `[ROLES] Could not locate role data file from "${source}" (tried: ${candidates.join(", ")})`
+  );
+}
 
 // Helper function to create Daily.co room for waiting game
 async function createDailyRoom(roomName) {
@@ -982,23 +1020,37 @@ Empirica.onRoundEnded(({ round }) => {
     reachedAgreement
   });
 
-  // Calculate and save bonus for each player
+  const negotiationType = game.get("negotiationType") || "features";
+
+  // Calculate and save bonus (the negotiated "value") for each player
   game.players.forEach((player) => {
     let bonus = 0;
 
     if (reachedAgreement) {
-      // Calculate player's score from the finalized proposal
-      const roleScoresheet = player.get("roleScoresheet");
-      const proposalOptions = finalProposal.options;
+      if (negotiationType === "price") {
+        // value = multiplier * (rp - price)
+        const k = player.get("roleMultiplier") ?? 1;
+        const rp = player.get("rolePriceRP") ?? 0;
+        const price = parseFloat(finalProposal.options?.value);
+        bonus = isFinite(price) ? k * (rp - price) : 0;
+      } else {
+        // features / multiple_choice: sum of the chosen option's score per issue.
+        const roleScoresheet = player.get("roleScoresheet");
+        const proposalOptions = finalProposal.options;
 
-      if (roleScoresheet && proposalOptions) {
-        bonus = Object.entries(roleScoresheet).reduce((sum, [category]) => {
-          const optionIdx = proposalOptions[category] ?? 1; // Default to exclude (index 1)
-          return sum + (roleScoresheet[category]?.[optionIdx]?.score || 0);
-        }, 0);
+        if (roleScoresheet && proposalOptions) {
+          bonus = Object.entries(roleScoresheet).reduce((sum, [category, options]) => {
+            let optionIdx = proposalOptions[category];
+            if (optionIdx === undefined || optionIdx === null) {
+              if (negotiationType === "features") optionIdx = 1; // default to Exclude
+              else return sum; // multiple_choice: unset issue contributes nothing
+            }
+            return sum + (options?.[optionIdx]?.score || 0);
+          }, 0);
+        }
       }
     } else {
-      // No agreement reached, use BATNA (reservation price)
+      // No agreement reached, use BATNA value (0 for price negotiations).
       bonus = player.get("roleRP") || 0;
     }
 
@@ -1022,13 +1074,23 @@ Empirica.onGameStart(({ game }) => {
     return;
   }
 
-  const rolesData = JSON.parse(execSync(`curl -s "${roleDataURL}"`).toString());
+  const rolesData = loadRoleData(roleDataURL);
   const roles = rolesData.roles;
+
+  // Negotiation type drives how the client interprets the role data and how
+  // scoring works. Absent => "features" (the original include/exclude form).
+  const negotiationType = rolesData.type || rolesData.negotiation_type || "features";
+  game.set("negotiationType", negotiationType);
 
   // Store tips in game state for client access
   game.set("tips", rolesData.tips || "");
 
-  console.log(`Fetched ${roles.length} roles from ${roleDataURL}`);
+  // Price negotiations carry a scenario-level display config (label, prefix, …).
+  if (negotiationType === "price") {
+    game.set("priceConfig", rolesData.price_config || rolesData.priceConfig || {});
+  }
+
+  console.log(`Fetched ${roles.length} roles (type: ${negotiationType}) from ${roleDataURL}`);
 
   // Create Daily.co room for this game
   (async () => {
@@ -1141,9 +1203,19 @@ Empirica.onGameStart(({ game }) => {
       const assignedRole = roles[index % roles.length];
       player.set("roleName", assignedRole.role_name);
       player.set("roleNarrative", assignedRole.narrative);
-      player.set("roleScoresheet", assignedRole.scoresheet);
       player.set("roleBATNA", assignedRole.BATNA);
-      player.set("roleRP", assignedRole.RP);
+
+      if (negotiationType === "price") {
+        // Price negotiation: value = multiplier * (rp - price). The no-agreement
+        // value (negotiator's surplus of walking away) is 0.
+        player.set("roleMultiplier", assignedRole.multiplier ?? 1);
+        player.set("rolePriceRP", assignedRole.rp ?? 0);
+        player.set("roleRP", 0);
+      } else {
+        // features / multiple_choice: payoff-per-option-per-issue table.
+        player.set("roleScoresheet", assignedRole.scoresheet);
+        player.set("roleRP", assignedRole.RP);
+      }
       console.log(`Assigned role "${assignedRole.role_name}" to player ${player.id}`);
     } else {
       console.warn(`No roles available to assign to player ${player.id}`);

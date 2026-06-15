@@ -1,13 +1,24 @@
 import React, { useState, useEffect } from "react";
 import Markdown from "react-markdown";
 import { usePlayer, useStage, useRound, useGame } from "@empirica/core/player/classic/react";
+import {
+  ScoringCalculator,
+  ProposalDetails,
+  proposalValue,
+  batnaThreshold,
+  canSubmit,
+  submitErrorMessage,
+  buildProposalOptions,
+} from "./negotiationDisplay";
 
 export function MaterialsPanel({
   roleName,
   roleNarrative,
   roleScoresheet,
   roleBATNA,
-  roleRP
+  roleRP,
+  roleMultiplier,
+  rolePriceRP,
 }) {
   const player = usePlayer();
   const stage = useStage();
@@ -15,11 +26,20 @@ export function MaterialsPanel({
   const game = useGame();
   const { playerCount } = game.get("treatment");
   const tips = game.get("tips") || "";
+
+  // Negotiation type + scenario-level price display config (set by the server).
+  const type = game.get("negotiationType") || "features";
+  const priceConfig = game.get("priceConfig") || {};
+  const role = { roleScoresheet, roleMultiplier, rolePriceRP };
+  const threshold = batnaThreshold(type, roleRP);
+
   const [activeTab, setActiveTab] = useState("calculator");
-  const [selectedOptions, setSelectedOptions] = useState({});
+  const [selectedOptions, setSelectedOptions] = useState({}); // { issue: optionIndex } (choice types)
+  const [priceValue, setPriceValue] = useState(""); // string (price type)
   const [showFinalizeModal, setShowFinalizeModal] = useState(false);
   const [showNegativePointsModal, setShowNegativePointsModal] = useState(false);
   const [showBlankProposalModal, setShowBlankProposalModal] = useState(false);
+  const [submitErrorMsg, setSubmitErrorMsg] = useState("");
 
   // Check if welcome modal has been shown before (stored in player state)
   const hasSeenWelcomeModal = player.get("hasSeenWelcomeModal") || false;
@@ -122,20 +142,16 @@ export function MaterialsPanel({
     window.scrollTo(0, 0);
   };
 
-  // Calculate current total points
-  const calculateTotalPoints = () => {
-    return Object.entries(roleScoresheet).reduce((sum, [category]) => {
-      const optionIdx = selectedOptions[category] ?? 1; // Default to exclude (index 1)
-      return sum + (roleScoresheet[category]?.[optionIdx]?.score || 0);
-    }, 0);
+  // Reset the calculator (both choice and price state)
+  const handleReset = () => {
+    setSelectedOptions({});
+    setPriceValue("");
   };
 
   // Handle proposal submission
   const handleSubmitProposal = () => {
-    // Check if at least one item is selected (at least one category has option 0)
-    const hasAtLeastOneItem = Object.values(selectedOptions).some(optionIdx => optionIdx === 0);
-
-    if (!hasAtLeastOneItem) {
+    if (!canSubmit(type, roleScoresheet, selectedOptions, priceValue)) {
+      setSubmitErrorMsg(submitErrorMessage(type));
       setShowBlankProposalModal(true);
       return;
     }
@@ -145,7 +161,7 @@ export function MaterialsPanel({
       submittedBy: player.id,
       submittedByName: player.get("displayName") || player.id,
       timestamp: Date.now(),
-      options: { ...selectedOptions },
+      options: buildProposalOptions(type, roleScoresheet, selectedOptions, priceValue),
       initialVotes: {},
       finalVotes: {},
       modalDismissed: {}
@@ -158,20 +174,12 @@ export function MaterialsPanel({
 
   // Handle vote on proposal (initial votes)
   const handleVote = (proposalId, vote) => {
-    // If voting "accept", check if proposal has negative points for this player
+    // If voting "accept", check the proposal isn't worth negative value to you.
     if (vote === "accept") {
       const proposal = history.find(p => p.id === proposalId);
-
-      if (proposal) {
-        const proposalPoints = Object.entries(roleScoresheet).reduce((sum, [category]) => {
-          const optionIdx = proposal.options[category] ?? 1;
-          return sum + (roleScoresheet[category]?.[optionIdx]?.score || 0);
-        }, 0);
-
-        if (proposalPoints < 0) {
-          setShowNegativePointsModal(true);
-          return;
-        }
+      if (proposal && proposalValue(type, role, proposal) < 0) {
+        setShowNegativePointsModal(true);
+        return;
       }
     }
 
@@ -185,12 +193,13 @@ export function MaterialsPanel({
     round.set("proposalHistory", updatedHistory);
   };
 
-  // Handle modifying a rejected proposal
-  const handleModifyProposal = (proposalOptions) => {
-    // Set the calculator checkboxes to match the proposal
-    setSelectedOptions(proposalOptions);
-
-    // Switch to calculator tab
+  // Handle modifying a past proposal (load it back into the calculator)
+  const handleModifyProposal = (proposal) => {
+    if (type === "price") {
+      setPriceValue(proposal.options?.value !== undefined ? String(proposal.options.value) : "");
+    } else {
+      setSelectedOptions(proposal.options || {});
+    }
     handleTabChange("calculator");
   };
 
@@ -296,123 +305,52 @@ export function MaterialsPanel({
         {activeTab === "calculator" && (
           <div className="space-y-4">
             {/* BATNA Card */}
-            {(roleBATNA || roleRP !== undefined) && (
-              <div className="bg-white rounded-lg shadow-sm p-4">
-                <h4 className="text-base font-bold text-gray-900 mb-2">
-                  What if I don't reach agreement?
-                </h4>
-                {roleBATNA && (
-                  <p className="text-sm text-gray-700 mb-1">{roleBATNA}</p>
-                )}
-                {roleRP !== undefined && (
-                  <p className="text-sm text-gray-700">
-                    If you don't reach agreement, you will earn <span className="font-bold">{roleRP} points</span>.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Main Scoring Area */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-
-              {/* Table Header */}
-              <div className="flex items-center px-4 py-2 mb-1">
-                <span className="w-8"></span> {/* Checkbox space */}
-                <span className="text-xs font-bold text-gray-700 uppercase flex-shrink-0 w-[140px]">
-                  Feature
-                </span>
-                <span className="text-xs font-bold text-gray-700 uppercase flex-shrink-0 w-[80px] text-center">
-                  Points
-                </span>
-                <span className="text-xs font-bold text-gray-700 uppercase flex-1 ml-4">
-                  Reason
-                </span>
-              </div>
-
-              {/* Main content area with rows and total points side by side */}
-              <div className="flex gap-6">
-                {/* Left side: Scoresheet rows (2/3 width) */}
-                <div className="flex-[9] space-y-2">
-                  {Object.entries(roleScoresheet)
-                    .sort(([, optionsA], [, optionsB]) => optionsB[0].score - optionsA[0].score)
-                    .map(([category, options]) => {
-                    const includeOption = options[0];
-                    const isChecked = selectedOptions[category] === 0;
-
-                    return (
-                      <div key={category} className="flex items-center bg-white rounded px-4 py-2.5 border border-blue-300">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            setSelectedOptions(prev => {
-                              if (e.target.checked) {
-                                return { ...prev, [category]: 0 };
-                              } else {
-                                return { ...prev, [category]: 1 };
-                              }
-                            });
-                          }}
-                          className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer mr-3"
-                        />
-                        <span className="text-sm font-semibold text-gray-800 flex-shrink-0 w-[140px]">
-                          {category.replace(/_/g, " ")}
-                        </span>
-                        <span className={`text-base font-bold flex-shrink-0 w-[80px] text-center ${
-                          isChecked
-                            ? (includeOption.score >= 0 ? 'text-blue-600' : 'text-red-600')
-                            : 'text-gray-400'
-                        }`}>
-                          {includeOption.score >= 0 ? '+' : ''}{includeOption.score} pts
-                        </span>
-                        <span className="text-sm text-gray-600 flex-1 ml-4">
-                          {includeOption.reason}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Right side: Total Points (1/3 width) */}
-                <div className="flex-[4] flex flex-col items-center justify-start">
-                  <div className="text-center bg-white rounded-lg p-6 shadow-md w-full">
-                    <h3 className="text-lg font-semibold text-gray-700 mb-2">Total Points</h3>
-                    <div className="text-5xl font-bold mb-4">
-                      <span className="text-blue-600">
-                        {calculateTotalPoints().toFixed(2)}
-                      </span>
-                    </div>
-                    {roleRP !== undefined && (
-                      <div className={`text-sm font-semibold ${
-                        calculateTotalPoints() >= roleRP ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {calculateTotalPoints() >= roleRP ? '✓ Beats your BATNA!' : '✗ Below your BATNA'}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-6 flex flex-col gap-2 w-full">
-                    <button
-                      onClick={handleSubmitProposal}
-                      disabled={pendingProposal !== null}
-                      className={`px-4 py-2 rounded font-semibold transition-colors text-sm ${
-                        pendingProposal !== null
-                          ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                          : "bg-green-600 text-white hover:bg-green-700"
-                      }`}
-                    >
-                      {pendingProposal !== null ? "Proposal Pending" : "Submit Proposal"}
-                    </button>
-                    <button
-                      onClick={() => setSelectedOptions({})}
-                      className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors text-sm font-medium"
-                    >
-                      Reset All
-                    </button>
-                  </div>
-                </div>
-              </div>
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <h4 className="text-base font-bold text-gray-900 mb-2">
+                What if I don't reach agreement?
+              </h4>
+              {roleBATNA && (
+                <p className="text-sm text-gray-700 mb-1">{roleBATNA}</p>
+              )}
+              <p className="text-sm text-gray-700">
+                If you don't reach agreement, you will earn <span className="font-bold">{threshold} value</span>.
+              </p>
             </div>
+
+            {/* Main Scoring Area (type-aware) */}
+            <ScoringCalculator
+              type={type}
+              roleScoresheet={roleScoresheet}
+              priceConfig={priceConfig}
+              roleMultiplier={roleMultiplier}
+              rolePriceRP={rolePriceRP}
+              roleRP={roleRP}
+              selection={selectedOptions}
+              onSelectionChange={setSelectedOptions}
+              priceStr={priceValue}
+              onPriceChange={setPriceValue}
+              footer={
+                <div className="flex flex-col gap-2 w-full">
+                  <button
+                    onClick={handleSubmitProposal}
+                    disabled={pendingProposal !== null}
+                    className={`px-4 py-2 rounded font-semibold transition-colors text-sm ${
+                      pendingProposal !== null
+                        ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                        : "bg-green-600 text-white hover:bg-green-700"
+                    }`}
+                  >
+                    {pendingProposal !== null ? "Proposal Pending" : "Submit Proposal"}
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors text-sm font-medium"
+                  >
+                    Reset All
+                  </button>
+                </div>
+              }
+            />
           </div>
         )}
 
@@ -430,44 +368,33 @@ export function MaterialsPanel({
                   </span>
                 </div>
 
-                {/* Calculate points for this player */}
+                {/* Value for this player */}
                 {(() => {
-                  const proposalPoints = Object.entries(roleScoresheet).reduce((sum, [category]) => {
-                    const optionIdx = pendingProposal.options[category] ?? 1;
-                    return sum + (roleScoresheet[category]?.[optionIdx]?.score || 0);
-                  }, 0);
+                  const value = proposalValue(type, role, pendingProposal);
 
                   return (
                     <div className="mb-6">
                       <div className="text-center mb-4">
                         <p className="text-sm text-gray-600 mb-1">Value to you:</p>
                         <p className="text-4xl font-bold text-blue-600">
-                          {proposalPoints.toFixed(2)} points
+                          {value.toFixed(2)}
                         </p>
-                        {roleRP !== undefined && (
-                          <p className={`text-sm font-semibold mt-1 ${
-                            proposalPoints >= roleRP ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {proposalPoints >= roleRP ? '✓ Beats your BATNA' : '✗ Below your BATNA'}
-                          </p>
-                        )}
+                        <p className={`text-sm font-semibold mt-1 ${
+                          value >= threshold ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {value >= threshold ? '✓ Beats your BATNA' : '✗ Below your BATNA'}
+                        </p>
                       </div>
 
                       {/* Show proposal details */}
                       <div className="bg-blue-50 rounded p-4 mb-4">
                         <h4 className="text-sm font-bold text-gray-700 mb-2">Proposal Details:</h4>
-                        <div className="space-y-1">
-                          {Object.entries(roleScoresheet).map(([category]) => {
-                            const optionIdx = pendingProposal.options[category] ?? 1;
-                            const isIncluded = optionIdx === 0;
-                            return (
-                              <div key={category} className="flex items-center text-sm">
-                                <span className={`w-4 h-4 mr-2 rounded ${isIncluded ? 'bg-green-500' : 'bg-gray-300'}`}></span>
-                                <span className="text-gray-700">{category.replace(/_/g, " ")}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
+                        <ProposalDetails
+                          type={type}
+                          roleScoresheet={roleScoresheet}
+                          priceConfig={priceConfig}
+                          proposal={pendingProposal}
+                        />
                       </div>
 
                       {/* Vote buttons or status */}
@@ -516,11 +443,8 @@ export function MaterialsPanel({
                 </h3>
                 <div className="space-y-3">
                   {[...allHistoryProposals].reverse().map((proposal) => {
-                    // Calculate points for this player
-                    const proposalPoints = Object.entries(roleScoresheet).reduce((sum, [category]) => {
-                      const optionIdx = proposal.options[category] ?? 1;
-                      return sum + (roleScoresheet[category]?.[optionIdx]?.score || 0);
-                    }, 0);
+                    // Value for this player
+                    const value = proposalValue(type, role, proposal);
 
                     // Count yes votes (from initial votes)
                     const yesVotes = Object.values(proposal.initialVotes).filter(v => v === "accept").length;
@@ -548,21 +472,16 @@ export function MaterialsPanel({
                           {/* Proposal items list */}
                           <div className="flex-1">
                             <h5 className="text-xs font-bold text-gray-600 uppercase mb-2">Proposal Items:</h5>
-                            <div className="space-y-1">
-                              {Object.entries(roleScoresheet).map(([category]) => {
-                                const optionIdx = proposal.options[category] ?? 1;
-                                const isIncluded = optionIdx === 0;
-                                return (
-                                  <div key={category} className="flex items-center text-xs">
-                                    <span className={`w-3 h-3 mr-2 rounded ${isIncluded ? 'bg-green-500' : 'bg-gray-300'}`}></span>
-                                    <span className="text-gray-700">{category.replace(/_/g, " ")}</span>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                            <ProposalDetails
+                              type={type}
+                              roleScoresheet={roleScoresheet}
+                              priceConfig={priceConfig}
+                              proposal={proposal}
+                              small
+                            />
                           </div>
 
-                          {/* Vote count and points - more prominent */}
+                          {/* Vote count and value - more prominent */}
                           <div className="text-center bg-white rounded p-3 border border-gray-300 min-w-[120px]">
                             <p className={`text-3xl font-bold ${voteColor} mb-1`}>
                               {yesVotes}/{playerCount}
@@ -571,13 +490,13 @@ export function MaterialsPanel({
                               Accepted
                             </p>
                             <p className="text-lg font-bold text-gray-700">
-                              {proposalPoints.toFixed(2)} pts
+                              {value.toFixed(2)} value
                             </p>
                           </div>
                         </div>
                         <button
                           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium"
-                          onClick={() => handleModifyProposal(proposal.options)}
+                          onClick={() => handleModifyProposal(proposal)}
                         >
                           Modify
                         </button>
@@ -606,12 +525,9 @@ export function MaterialsPanel({
       {showFinalizeModal && acceptedPendingProposal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full mx-4">
-            {/* Calculate points for this player */}
+            {/* Value for this player */}
             {(() => {
-              const proposalPoints = Object.entries(roleScoresheet).reduce((sum, [category]) => {
-                const optionIdx = acceptedPendingProposal.options[category] ?? 1;
-                return sum + (roleScoresheet[category]?.[optionIdx]?.score || 0);
-              }, 0);
+              const value = proposalValue(type, role, acceptedPendingProposal);
 
               const finalVoteCount = Object.keys(acceptedPendingProposal.finalVotes).length;
               const hasVoted = !!acceptedPendingProposal.finalVotes?.[player.id];
@@ -675,9 +591,9 @@ export function MaterialsPanel({
                   </div>
 
                   <div className="text-center mb-6 p-4 bg-green-50 rounded">
-                    <p className="text-sm text-gray-600 mb-1">Your score with this proposal:</p>
+                    <p className="text-sm text-gray-600 mb-1">Your value with this proposal:</p>
                     <p className="text-4xl font-bold text-green-600">
-                      {proposalPoints.toFixed(2)} points
+                      {value.toFixed(2)}
                     </p>
                   </div>
 
@@ -706,7 +622,7 @@ export function MaterialsPanel({
         </div>
       )}
 
-      {/* Negative Points Warning Modal */}
+      {/* Negative Value Warning Modal */}
       {showNegativePointsModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full mx-4">
@@ -716,7 +632,7 @@ export function MaterialsPanel({
                 Cannot Accept Deal
               </h3>
               <p className="text-lg text-gray-700">
-                You can't accept negative points.
+                You can't accept a deal worth negative value.
               </p>
             </div>
             <button
@@ -729,17 +645,17 @@ export function MaterialsPanel({
         </div>
       )}
 
-      {/* Blank Proposal Warning Modal */}
+      {/* Incomplete Proposal Warning Modal */}
       {showBlankProposalModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full mx-4">
             <div className="text-center mb-6">
               <div className="text-6xl mb-4">⚠️</div>
               <h3 className="text-2xl font-bold text-red-600 mb-3">
-                Cannot Submit Blank Proposal
+                Cannot Submit Proposal
               </h3>
               <p className="text-lg text-gray-700">
-                You must select at least one item.
+                {submitErrorMsg}
               </p>
             </div>
             <button

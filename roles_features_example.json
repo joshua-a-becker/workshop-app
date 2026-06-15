@@ -1,0 +1,70 @@
+{
+  "type": "features",
+  "roles": [
+    {
+      "role_name": "Tenant",
+      "narrative": "You're negotiating the terms of a one-year apartment lease you're keen to sign. Several optional terms are on the table, and for each one you and the landlord decide together whether to **include** it in the lease or leave it out.\n\nSome terms matter a lot to you (bringing your dog, a reserved parking spot), some only a little, and one — a longer two-year commitment — you'd rather avoid because you value flexibility. The landlord has their own preferences, so look for trades: give ground on a term you care little about to win one you care a lot about. Higher value means a better deal for you.\n\nIf you can't reach a package worth more than 0 to you, you'll keep apartment-hunting — you have other options.",
+      "BATNA": "Your best alternative is another apartment you've already seen. Walking away is worth 0 value, so only accept a lease worth more than 0.",
+      "RP": 0,
+      "scoresheet": {
+        "Pet_Allowance": [
+          { "option": "Include", "score": 4, "reason": "You really want to keep your dog" },
+          { "option": "Exclude", "score": 0, "reason": "No pets allowed" }
+        ],
+        "Reserved_Parking": [
+          { "option": "Include", "score": 3, "reason": "A guaranteed spot saves you daily hassle" },
+          { "option": "Exclude", "score": 0, "reason": "Park on the street" }
+        ],
+        "Gym_Access": [
+          { "option": "Include", "score": 2, "reason": "Saves you a separate gym membership" },
+          { "option": "Exclude", "score": 0, "reason": "No building gym access" }
+        ],
+        "Fresh_Repaint": [
+          { "option": "Include", "score": 1, "reason": "A freshly painted unit is nicer to move into" },
+          { "option": "Exclude", "score": 0, "reason": "Move in as-is" }
+        ],
+        "Early_Move_In": [
+          { "option": "Include", "score": 2, "reason": "You can leave your current place sooner" },
+          { "option": "Exclude", "score": 0, "reason": "Move in on the standard date" }
+        ],
+        "Two_Year_Term": [
+          { "option": "Include", "score": -2, "reason": "Locks you in and reduces your flexibility" },
+          { "option": "Exclude", "score": 0, "reason": "A standard one-year term" }
+        ]
+      }
+    },
+    {
+      "role_name": "Landlord",
+      "narrative": "You own the apartment and are negotiating the lease with a promising tenant. For each optional term you decide together whether to **include** it or leave it out.\n\nSome terms cost you (a fresh repaint, letting them move in early before you've cleaned), some you don't mind or even like (a reserved spot you can charge for, a two-year commitment that reduces turnover). The tenant has their own priorities, so expect to trade — concede on something cheap for you to hold the line on something costly. Higher value means a better deal for you.\n\nIf you can't reach a package worth more than 0 to you, you'll list the unit again — you have other interested applicants.",
+      "BATNA": "Your best alternative is to re-list the unit for other applicants. That is worth 0 value, so only accept a lease worth more than 0.",
+      "RP": 0,
+      "scoresheet": {
+        "Pet_Allowance": [
+          { "option": "Include", "score": -1, "reason": "A small risk of wear and noise complaints" },
+          { "option": "Exclude", "score": 0, "reason": "No pets, no risk" }
+        ],
+        "Reserved_Parking": [
+          { "option": "Include", "score": 2, "reason": "You can bundle in a parking fee" },
+          { "option": "Exclude", "score": 0, "reason": "Keep the spot free for visitors" }
+        ],
+        "Gym_Access": [
+          { "option": "Include", "score": 1, "reason": "The gym already exists — costs you nothing to grant" },
+          { "option": "Exclude", "score": 0, "reason": "Withhold building amenities" }
+        ],
+        "Fresh_Repaint": [
+          { "option": "Include", "score": -4, "reason": "Repainting is expensive and time-consuming" },
+          { "option": "Exclude", "score": 0, "reason": "No painting cost" }
+        ],
+        "Early_Move_In": [
+          { "option": "Include", "score": -3, "reason": "You lose your cleaning and prep window" },
+          { "option": "Exclude", "score": 0, "reason": "Keep your full turnaround time" }
+        ],
+        "Two_Year_Term": [
+          { "option": "Include", "score": 3, "reason": "Less turnover and guaranteed occupancy" },
+          { "option": "Exclude", "score": 0, "reason": "A standard one-year term" }
+        ]
+      }
+    }
+  ],
+  "tips": "<p class=\"text-gray-700 mb-4\">This is a <strong>features</strong> negotiation: for each term you jointly decide to <strong>include</strong> it or <strong>exclude</strong> it. Each term is worth a different amount to each side, which opens the door to <strong>integrative</strong> (\"win-win\") deals.</p><p>Look for <strong>logrolling</strong> opportunities — concede on a term that costs you little to gain one you value highly. A term that one party loves and the other barely minds should usually be <em>included</em>; a term that costs one party a lot and helps the other only a little should usually be <em>excluded</em>. Don't treat every term as a fight.</p><p>Always keep your <strong>BATNA</strong> in mind: never accept a total package worth less than 0 to you. Aim for the set of include/exclude choices that grows the total value for both sides.</p>"
+}

@@ -10,8 +10,13 @@ export function VideoNegotiate({ profileComponent }) {
   const roleScoresheet = player.get("roleScoresheet");
   const roleBATNA = player.get("roleBATNA");
   const roleRP = player.get("roleRP");
+  const roleMultiplier = player.get("roleMultiplier");
+  const rolePriceRP = player.get("rolePriceRP");
 
-  if (!roleName || !roleNarrative || !roleScoresheet) {
+  // Price roles have no scoresheet; they carry a multiplier + reservation price.
+  const hasRoleData = roleScoresheet || roleMultiplier !== undefined;
+
+  if (!roleName || !roleNarrative || !hasRoleData) {
     return (
       <div className="w-full h-full flex items-center justify-center">
         <p className="text-gray-500">Loading your role...</p>
@@ -28,6 +33,8 @@ export function VideoNegotiate({ profileComponent }) {
           roleScoresheet={roleScoresheet}
           roleBATNA={roleBATNA}
           roleRP={roleRP}
+          roleMultiplier={roleMultiplier}
+          rolePriceRP={rolePriceRP}
         />
       </div>
       <div className="w-[30%] fixed right-0 top-0 h-screen">
