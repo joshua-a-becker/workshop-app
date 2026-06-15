@@ -263,27 +263,53 @@ function sweepLobbyPresence(ctx) {
   for (const game of waitingGames) {
     const waitingPlayers = { ...(game.get("waitingPlayers") || {}) };
     const groupAdmins = { ...(game.get("groupAdmins") || {}) };
-    const removed = [];
+    let changed = false;
 
-    for (const [playerId, info] of Object.entries(waitingPlayers)) {
-      const playerScope = playerById.get(playerId);
-      const lastSeen = playerScope?.get("lastSeen");
-      const lastTs = lastSeen?.ts ?? info.joinedAt ?? 0;
-      if (now - lastTs > PRESENCE_STALE_MS) {
-        removed.push({ playerId, groupName: info.groupName || "default" });
-        delete waitingPlayers[playerId];
-      }
+    // A player belongs in this lobby roster iff Empirica still has them
+    // assigned to this waiting game AND they look present. "Present" means a
+    // fresh heartbeat, or — for someone who has not heartbeated yet — still
+    // within the new-joiner grace window measured from their stable join time.
+    const isPresent = (p) => {
+      const lastTs = p.get("lastSeen")?.ts;
+      if (lastTs != null) return now - lastTs <= PRESENCE_STALE_MS;
+      const joinedAt = p.get("lobbyJoinedAt") ?? 0;
+      return now - joinedAt <= NEW_JOINER_GRACE_MS;
+    };
+
+    // Re-add any present, still-assigned player missing from the roster. This
+    // makes the roster self-healing: a player briefly pruned (or reconnecting)
+    // reappears on the next sweep instead of being stranded forever.
+    for (const p of players) {
+      if (p.get("gameID") !== game.id) continue;
+      if (waitingPlayers[p.id] || !isPresent(p)) continue;
+      const groupName = p.get("groupName") || "default";
+      waitingPlayers[p.id] = {
+        id: p.id,
+        displayName: p.get("displayName") || "Anonymous",
+        groupName,
+        joinedAt: p.get("lobbyJoinedAt") ?? now,
+      };
+      if (!groupAdmins[groupName]) groupAdmins[groupName] = p.id;
+      changed = true;
+      console.log(`[PRESENCE] Re-added ${p.id} to waiting game ${game.id} (group "${groupName}")`);
     }
 
-    if (removed.length === 0) continue;
-
-    for (const { playerId, groupName } of removed) {
+    // Prune players who are no longer assigned here or who have gone absent.
+    for (const [playerId, info] of Object.entries(waitingPlayers)) {
+      const playerScope = playerById.get(playerId);
+      const stillAssigned = playerScope && playerScope.get("gameID") === game.id;
+      if (stillAssigned && isPresent(playerScope)) continue;
+      const groupName = info.groupName || "default";
+      delete waitingPlayers[playerId];
       reassignAdmin(waitingPlayers, groupAdmins, groupName, playerId);
+      changed = true;
       console.log(`[PRESENCE] Pruned ${playerId} from waiting game ${game.id} (group "${groupName}")`);
     }
 
-    game.set("waitingPlayers", waitingPlayers);
-    game.set("groupAdmins", groupAdmins);
+    if (changed) {
+      game.set("waitingPlayers", waitingPlayers);
+      game.set("groupAdmins", groupAdmins);
+    }
   }
 
   if (waitingGames.length > 0) Empirica.flush();
@@ -875,11 +901,15 @@ Empirica.on("player", async (ctx, { player }) => {
   // (usePlayers() doesn't work reliably in lobby context)
   const waitingPlayers = waitingGame.get("waitingPlayers") || {};
   const playerGroupName = player.get("groupName") || "default";
+  const joinedAt = Date.now();
+  // Stable join time on the player scope: survives roster pruning so the lobby
+  // sweep can grant a consistent new-joiner grace and re-add the player.
+  player.set("lobbyJoinedAt", joinedAt);
   waitingPlayers[player.id] = {
     id: player.id,
     displayName: player.get("displayName") || "Anonymous",
     groupName: playerGroupName,
-    joinedAt: Date.now(),
+    joinedAt,
   };
   waitingGame.set("waitingPlayers", waitingPlayers);
 
