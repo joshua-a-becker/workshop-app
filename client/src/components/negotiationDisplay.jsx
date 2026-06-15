@@ -240,6 +240,11 @@ export function ScoringCalculator({
   const isFeatures = type === FEATURES;
   const isMultipleChoice = type === MULTIPLE_CHOICE;
 
+  // For features, an empty selection is a meaningful value (everything
+  // excluded = 0). For multiple_choice and price there is no value until the
+  // input is complete, so we show a "-.--" placeholder instead of a stray 0.
+  const valueReady = isFeatures ? true : submittable;
+
   return (
     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
       {title && <h3 className="text-2xl font-bold text-blue-900 mb-4">{title}</h3>}
@@ -298,15 +303,22 @@ export function ScoringCalculator({
               {isPrice ? "Your Value" : "Total Value"}
             </h3>
             <div className="text-5xl font-bold mb-4">
-              <span className="text-blue-600">{value.toFixed(2)}</span>
+              <span className={valueReady ? "text-blue-600" : "text-gray-300"}>
+                {valueReady ? value.toFixed(2) : "-.--"}
+              </span>
             </div>
-            <div className={`text-sm font-semibold ${
-              value >= threshold ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {value >= threshold ? '✓ Beats your BATNA!' : '✗ Below your BATNA'}
-            </div>
+            {valueReady && (
+              <div className={`text-sm font-semibold ${
+                value >= threshold ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {value >= threshold ? '✓ Beats your BATNA!' : '✗ Below your BATNA'}
+              </div>
+            )}
             {isMultipleChoice && !submittable && (
               <p className="text-xs text-gray-500 mt-3">Choose every issue to submit.</p>
+            )}
+            {isPrice && !submittable && (
+              <p className="text-xs text-gray-500 mt-3">Enter a number to see your value.</p>
             )}
           </div>
 
