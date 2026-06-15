@@ -333,9 +333,9 @@ export function MaterialsPanel({
                 <div className="flex flex-col gap-2 w-full">
                   <button
                     onClick={handleSubmitProposal}
-                    disabled={pendingProposal !== null}
+                    disabled={pendingProposal !== null || !canSubmit(type, roleScoresheet, selectedOptions, priceValue)}
                     className={`px-4 py-2 rounded font-semibold transition-colors text-sm ${
-                      pendingProposal !== null
+                      pendingProposal !== null || !canSubmit(type, roleScoresheet, selectedOptions, priceValue)
                         ? "bg-gray-400 text-gray-200 cursor-not-allowed"
                         : "bg-green-600 text-white hover:bg-green-700"
                     }`}
