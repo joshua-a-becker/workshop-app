@@ -66,7 +66,8 @@ Plus `roles_v1.json` / `roles_v2.json` — the original three-party vacation-pla
 4. **Read Role** (5 min) - Review private role narrative, scoresheet, and BATNA
 5. **Transition** (15 sec) - Countdown before negotiation begins
 6. **Negotiate** (30 min) - Live video negotiation with proposal submission and voting
-7. **Outcome** - Score display based on agreement or BATNA
+7. **Debrief & Discussion** - Same split-screen layout (video call on the right), with a tabbed panel on the left: the **Outcome** (score), a set of **Discussion Questions** to talk through as a group, and a **Debrief Video**. Content is driven by the `debrief` block in the role data.
+8. **Outcome (exit)** - Final score display based on agreement or BATNA
 
 ### Outcome Rules
 
@@ -126,6 +127,8 @@ group-negotiation/
 │   │   ├── components/
 │   │   │   ├── VideoChat.jsx            # Daily.co video grid with mic/camera toggle controls
 │   │   │   ├── VideoNegotiate.jsx       # Negotiation layout: MaterialsPanel (70%) + InteractionPanel (30%)
+│   │   │   ├── VideoDebrief.jsx         # Debrief layout: DebriefPanel (70%) + InteractionPanel (30%)
+│   │   │   ├── DebriefPanel.jsx         # Tabbed panel: Outcome, Discussion Questions, Debrief Video
 │   │   │   ├── MaterialsPanel.jsx       # Tabbed panel: Narrative, Scoring calculator, Proposals, Tips
 │   │   │   ├── negotiationDisplay.jsx   # Shared value logic + per-type calculator/proposal display (features/multiple_choice/price)
 │   │   │   ├── InteractionPanel.jsx     # Right panel wrapper: Profile bar + VideoChat
@@ -244,6 +247,7 @@ Dispatches to the appropriate component based on the current stage name:
 | `"Read Negotiation Role"` | `<ReadRole />` |
 | `"Ready To Negotiate"` | `<ReadyToNegotiate />` |
 | `"Time To Negotiate"` | `<VideoNegotiate />` |
+| `"Debrief & Discussion"` | `<VideoDebrief />` |
 
 Also handles the "waiting for other players" state when a player has submitted their stage.
 
@@ -370,6 +374,22 @@ Simple centered screen with large countdown number (15 seconds). Text: "Now that
 Split-screen layout:
 - **Left (70%)**: `<MaterialsPanel>` with all role data
 - **Right (30%, fixed)**: `<InteractionPanel>` with profile bar + video chat
+
+#### `VideoDebrief.jsx` — Post-Negotiation Debrief View
+
+Shown during the **"Debrief & Discussion"** stage (a separate round that runs after the negotiation round ends). Reuses the same split-screen layout as `VideoNegotiate`:
+- **Left (70%)**: `<DebriefPanel>`
+- **Right (30%, fixed)**: `<InteractionPanel>` with profile bar + video chat
+
+The live video call continues so the group can talk through the debrief together.
+
+#### `DebriefPanel.jsx` — Tabbed Debrief Interface
+
+Three self-paced tabs, each ending in a large button that advances to the next:
+
+1. **Outcome** — Shows whether the group reached agreement and the player's final score (read from `player.bonus` / `player.reachedAgreement`, set in `onRoundEnded`). Button: "Proceed to Discussion Questions".
+2. **Discussion Questions** — Numbered list of prompts (with optional guidance) for the group to talk through, from `debrief.discussion_questions` in the role data. Button: "Proceed to Debrief Video".
+3. **Debrief Video** — Plays the debrief video from `debrief.video_url`. Cloudflare Stream HLS manifest URLs are converted to the minimal Stream iframe player (just a play button + standard controls, no logos) via `toEmbedUrl()`; any other URL is embedded as-is.
 
 #### `MaterialsPanel.jsx` — Tabbed Negotiation Interface (~790 lines)
 
@@ -553,11 +573,14 @@ When a game starts, the server:
 8. **Initializes participant timestamps** for presence tracking
 9. **Creates stages**:
 
-| Stage | Name | Default Duration |
-|-------|------|---------|
-| 1 | "Read Negotiation Role" | `readRoleTime` (300s / 5 min) |
-| 2 | "Ready To Negotiate" | 15 seconds |
-| 3 | "Time To Negotiate" | `negotiateTime` (1800s / 30 min) |
+The game has **two rounds**: the **"Negotiation Game"** round (stages 1–3 below) and a **"Debrief"** round (stage 4). Splitting the debrief into its own round lets the negotiation round end first — so `onRoundEnded` computes each player's bonus before the Debrief stage displays the outcome.
+
+| Round | Stage | Name | Default Duration |
+|-------|-------|------|---------|
+| Negotiation Game | 1 | "Read Negotiation Role" | `readRoleTime` (300s / 5 min) |
+| Negotiation Game | 2 | "Ready To Negotiate" | 15 seconds |
+| Negotiation Game | 3 | "Time To Negotiate" | `negotiateTime` (1800s / 30 min) |
+| Debrief | 4 | "Debrief & Discussion" | `debriefTime` (1800s / 30 min) |
 
 ### Stage Monitoring (`onStageStart`)
 
@@ -571,12 +594,14 @@ See [Presence Tracking](#presence-tracking) for the full mechanism.
 
 ### Round End (`onRoundEnded`)
 
-When the round ends (either by time expiring or all players submitting):
+Fires when **any** round ends, but **returns immediately for the "Debrief" round** — only the "Negotiation Game" round produces a score, and the guard prevents the debrief round end from overwriting the computed bonus.
+
+When the negotiation round ends (either by time expiring or all players submitting):
 
 1. Checks if agreement was reached: last proposal must have unanimous "finalize" votes from all players
 2. **Agreement**: Calculates each player's bonus (their **value**) from the finalized proposal per the negotiation type — Σ chosen option scores for `features`/`multiple_choice`, or `multiplier · (rp − price)` for `price`
 3. **No agreement**: Each player receives their BATNA value (`roleRP` for choice types, `0` for `price`)
-4. Saves `bonus` on each player and `agreementReached` on the round
+4. Saves `bonus` and `reachedAgreement` on each player and `agreementReached` on the round
 
 ---
 
@@ -675,7 +700,7 @@ in real-time as players change their selections or the entered price.
 | `Empirica.on("player", "requestStart")` | Admin confirms Start modal | Splits the group via `chunkByMode` (exact/overfill) and creates + assigns one or more games; leftovers stay in the lobby |
 | `Empirica.onGameStart` | Game starts | Fetches roles, creates Daily.co room, assigns roles, creates stages |
 | `Empirica.onStageStart` | Stage starts | Initializes presence tracking, polls Daily.co, marks `player.leftAt` on stale heartbeats |
-| `Empirica.onRoundEnded` | Round ends | Calculates scores, saves bonuses |
+| `Empirica.onRoundEnded` | Round ends | Calculates scores, saves bonuses (no-ops for the "Debrief" round) |
 
 #### Key Functions
 
@@ -855,6 +880,32 @@ Single-issue price bargaining. Each role carries a `multiplier` (buyer `+1`, sel
 | `rp` | Number | price | Reservation price — the worst price still acceptable; value is `0` at this price. |
 | `price_config` | Object | price | Controls the number box: `label`, `prefix`, `suffix`, `min`, `max`, `step`, `description` (all optional). |
 | `tips` | String | all | HTML content displayed in the "Tips" tab. Shared across all roles. |
+| `debrief` | Object | all | Optional. Content for the post-negotiation Debrief stage (shared across all roles). See below. |
+
+### Debrief Block
+
+A top-level `debrief` object (shared across all roles, like `tips`) supplies the content for the **Debrief & Discussion** stage. All fields are optional — an absent `debrief` simply shows placeholder messages.
+
+```json
+{
+  "debrief": {
+    "video_title": "Debrief: Creating Value Through Logrolling",
+    "video_url": "https://customer-xxxx.cloudflarestream.com/<id>/manifest/video.m3u8",
+    "outcome_note": "Optional line shown under the score on the Outcome tab.",
+    "discussion_questions": [
+      { "question": "Which terms did you include vs. exclude?", "guidance": "Optional supporting hint shown under the question." },
+      "A plain string also works as a question with no guidance."
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `video_title` | String | Heading shown above the debrief video (defaults to "Debrief Video"). |
+| `video_url` | String | Debrief video URL. A Cloudflare Stream **HLS manifest** URL (`.../<id>/manifest/video.m3u8`) is auto-converted to the minimal Stream **iframe** player; any other embeddable URL is used as-is. |
+| `outcome_note` | String | Optional extra text on the Outcome tab. |
+| `discussion_questions` | Array | List of prompts. Each item is either a string, or an object `{ question, guidance }`. |
 
 ### Designing a Scenario
 
@@ -895,6 +946,7 @@ Treatments are configured via the Empirica admin panel when creating batches.
 | `playerCount` | Number | varies | Players per negotiation game |
 | `readRoleTime` | Number | 300 | Seconds for role reading stage (5 min) |
 | `negotiateTime` | Number | 1800 | Seconds for negotiation stage (30 min). Values **over 18000 (5 hours)** hide the countdown timer during the negotiate stage, giving "unlimited" time without changing the layout. |
+| `debriefTime` | Number | 1800 | Seconds for the Debrief & Discussion stage (30 min). Like `negotiateTime`, values **over 18000 (5 hours)** hide the countdown timer during the debrief stage. |
 | `roleDataURL` | String | — | URL **or local file path** for the role JSON data (e.g., a hosted `roles_v1.json`, or `roles_price_example.json` in the repo root) |
 
 ---
@@ -906,6 +958,7 @@ Treatments are configured via the Empirica admin panel when creating batches.
 | `participantKey` | Yes* | Unique player identifier for Empirica |
 | `studentId` | No | Auto-generates `participantKey` as `{studentId}_{YYYYMMDD}` |
 | `groupName` | Yes* | Group assignment for waiting room (prompted via form if missing) |
+| `displayName` | No | Pre-fills and auto-submits the display name step (after camera/mic permission). Use `+` or `%20` for spaces, e.g. `john+smith`. Must be 2–20 chars to auto-submit. |
 | `devKey` | No | Set to `oandi` for developer mode (auto-generates key, shows skip button) |
 | `skipIntro` | No | Set to `T` to skip all intro steps (auto-assigns random animal name) |
 
@@ -915,6 +968,9 @@ Treatments are configured via the Empirica admin panel when creating batches.
 ```
 # Standard participant
 https://host/?participantKey=abc123&groupName=TeamAlpha
+
+# Pre-filled, auto-submitted display name (+ = space)
+https://host/?participantKey=abc123&groupName=TeamAlpha&displayName=john+smith
 
 # Student with auto-generated key
 https://host/?studentId=john&groupName=Section1
@@ -1000,9 +1056,9 @@ When `NODE_ENV=development` or `devKey=oandi` in URL:
 
 All game state is automatically persisted by Empirica and exportable from the admin dashboard:
 
-- Player attributes: `roleName`, `roleNarrative`, `roleScoresheet`, `roleBATNA`, `roleRP`, `displayName`, `groupName`, `bonus`, `studentId`, `lastSeen`, `leftAt`, `dailyMeetingToken`
+- Player attributes: `roleName`, `roleNarrative`, `roleScoresheet`, `roleBATNA`, `roleRP`, `displayName`, `groupName`, `bonus`, `reachedAgreement`, `studentId`, `lastSeen`, `leftAt`, `dailyMeetingToken`
 - Round data: `proposalHistory` (complete record of all proposals and votes), `agreementReached`
-- Game data: `treatment`, `groupName`, `roomUrl`, `participantTimestamps`, `activeDailyCalls`, `tips`, and (on the waiting game) `waitingPlayers`, `groupAdmins`, `gamePlayerCount`
+- Game data: `treatment`, `groupName`, `roomUrl`, `participantTimestamps`, `activeDailyCalls`, `tips`, `debrief`, and (on the waiting game) `waitingPlayers`, `groupAdmins`, `gamePlayerCount`
 
 ### Daily.co Recordings & Transcripts
 

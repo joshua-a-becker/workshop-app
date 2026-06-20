@@ -58,5 +58,32 @@
       }
     }
   ],
-  "tips": "<p class=\"text-gray-700 mb-4\">This is a <strong>multi-issue</strong> negotiation, which opens the door to <strong>integrative</strong> (\"win-win\") deals. The key insight: the issues are worth different amounts to each side.</p><p>Look for <strong>logrolling</strong> opportunities — trade away an issue you care little about in exchange for one you value highly. If start date matters more to one party and salary more to the other, each can concede on the cheap issue to gain on the expensive one, leaving both better off than a simple compromise on every issue.</p><p>Always keep your <strong>BATNA</strong> in mind: never accept a total package worth less than 0 to you. And don't just split every issue down the middle — find the trades that grow the total value for everyone.</p>"
+  "tips": "<p class=\"text-gray-700 mb-4\">This is a <strong>multi-issue</strong> negotiation, which opens the door to <strong>integrative</strong> (\"win-win\") deals. The key insight: the issues are worth different amounts to each side.</p><p>Look for <strong>logrolling</strong> opportunities — trade away an issue you care little about in exchange for one you value highly. If start date matters more to one party and salary more to the other, each can concede on the cheap issue to gain on the expensive one, leaving both better off than a simple compromise on every issue.</p><p>Always keep your <strong>BATNA</strong> in mind: never accept a total package worth less than 0 to you. And don't just split every issue down the middle — find the trades that grow the total value for everyone.</p>",
+  "debrief": {
+    "video_title": "Debrief: Trading Across Issues",
+    "video_url": "https://customer-dxcdx06s3qk3zhto.cloudflarestream.com/726cfe7355a9dfefe0ae887131a88f6b/manifest/video.m3u8",
+    "outcome_note": "Compare scores across your group — the best deals here come from packaging issues together, not settling each one in isolation.",
+    "discussion_questions": [
+      {
+        "question": "On which issue did each side give the most ground?",
+        "guidance": "Map each issue to who cared about it most and check whether your final choices matched."
+      },
+      {
+        "question": "Did you negotiate issues one at a time or as a package?",
+        "guidance": "Discuss how bundling issues changed (or could have changed) the result."
+      },
+      {
+        "question": "Where did your priorities differ most from the other party's?",
+        "guidance": "Those gaps are exactly where integrative trades create value."
+      },
+      {
+        "question": "Did anyone anchor first, and what effect did it have?",
+        "guidance": "Talk about how the opening offer shaped the rest of the conversation."
+      },
+      {
+        "question": "What would have made this a better deal for both sides?",
+        "guidance": "Look for a trade you both missed that would have raised the combined total."
+      }
+    ]
+  }
 }

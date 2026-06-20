@@ -5,6 +5,7 @@ import { EmpiricaContext } from "@empirica/core/player/classic/react";
 import { EmpiricaMenu, EmpiricaParticipant } from "@empirica/core/player/react";
 import React, { useState, createContext, useEffect, useRef, useMemo, useCallback } from "react";
 import { Game } from "./Game";
+import { ConsentUrlRouter } from "./intro-exit/ConsentUrlRouter.jsx"
 import { CustomLobby } from "./intro-exit/CustomLobby";
 import { DisplayNameEntry } from "./intro-exit/DisplayNameEntry.jsx";
 import { AutoPlayerIdForm } from "./intro-exit/AutoPlayerIdForm.jsx";
@@ -127,6 +128,7 @@ export default function App() {
 
   // Generate random participantKey if missing and devKey is "oandi"
   let playerKey = urlParams.get("participantKey") || "";
+  let scenarioId = urlParams.get("scenario") || "";
   const devKey = urlParams.get("devKey") || "";
 
   // If studentId is present, generate participantKey from it
@@ -166,7 +168,7 @@ export default function App() {
   };
 
   // Flags for conditional rendering (no early returns!)
-  const showInvalidURL = !playerKey;
+  const showInvalidURL = !playerKey || !scenarioId;
   const showGroupNameEntry = playerKey && !groupName;
 
   function introSteps({ game, player }) {
@@ -190,6 +192,9 @@ export default function App() {
       // Set groupName from URL for group assignment
       const groupNameFromUrl = urlParams.get("groupName") || "default";
       player.set("groupName", groupNameFromUrl);
+
+      // Set scenario from URL for batch routing (empty if absent → lobby shows error)
+      player.set("scenario", urlParams.get("scenario") || "");
 
       return []
     }
@@ -1042,7 +1047,7 @@ export default function App() {
           <div>
             <EmpiricaContext playerCreate={AutoPlayerIdForm} finished={Finished}
              lobby={CustomLobby}
-            introSteps={introSteps} exitSteps={exitSteps}  disableConsent={true} >
+            introSteps={introSteps} exitSteps={exitSteps} consent={ConsentUrlRouter} disableConsent={true}>
               <Game />
             </EmpiricaContext>
           </div>

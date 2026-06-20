@@ -121,5 +121,32 @@
       }
     }
   ],
-  "tips": "<p class=\"text-gray-700 mb-4\">Negotiation is a skill that can be learned and improved with practice. At its core, negotiation is about making choices under conditions of <strong>interdependence</strong>: two or more parties want something, and each party's success depends, at least in part, on the decisions of the others. While the art of negotiation can seem daunting, there are several fundamental concepts that provide a foundation for effective bargaining. Understanding these concepts can help negotiators achieve better outcomes and avoid common pitfalls.</p><p>One of the most important ideas in negotiation is the concept of <strong>BATNA</strong> and <strong>reservation price</strong>. BATNA stands for \"Best Alternative to a Negotiated Agreement.\" It is essentially your fallback option—the \"thing\" you will pursue if the current negotiation fails. Your BATNA is not just abstract; it is the concrete alternative that protects you from agreeing to a deal that leaves you worse off than your options outside the negotiation. Closely related is the <strong>reservation price</strong>, which is the value of your BATNA quantified. It represents the minimum acceptable deal you are willing to accept.</p><p>The number one rule of negotiation is simple: <strong>never accept a deal worse than your BATNA</strong>! Knowing your BATNA and reservation price gives you a clear boundary and helps prevent you from making poor concessions under pressure.</p><p class=\"text-gray-700 mb-4\">Another fundamental concept is the possibility of <strong>integrative negotiation</strong>, which is when you create value or \"expand the pie\" within a deal rather than simply dividing a fixed amount of pie. The key insight is that what matters a lot to you may matter less to someone else. By identifying these differences in priorities, negotiators can make strategic tradeoffs: conceding on issues that are low priority to gain on issues that are high priority. This approach transforms negotiation from a zero-sum battle into an opportunity for mutual gain, where both parties can walk away better off than if they had simply split the difference.</p>"
+  "tips": "<p class=\"text-gray-700 mb-4\">Negotiation is a skill that can be learned and improved with practice. At its core, negotiation is about making choices under conditions of <strong>interdependence</strong>: two or more parties want something, and each party's success depends, at least in part, on the decisions of the others. While the art of negotiation can seem daunting, there are several fundamental concepts that provide a foundation for effective bargaining. Understanding these concepts can help negotiators achieve better outcomes and avoid common pitfalls.</p><p>One of the most important ideas in negotiation is the concept of <strong>BATNA</strong> and <strong>reservation price</strong>. BATNA stands for \"Best Alternative to a Negotiated Agreement.\" It is essentially your fallback option—the \"thing\" you will pursue if the current negotiation fails. Your BATNA is not just abstract; it is the concrete alternative that protects you from agreeing to a deal that leaves you worse off than your options outside the negotiation. Closely related is the <strong>reservation price</strong>, which is the value of your BATNA quantified. It represents the minimum acceptable deal you are willing to accept.</p><p>The number one rule of negotiation is simple: <strong>never accept a deal worse than your BATNA</strong>! Knowing your BATNA and reservation price gives you a clear boundary and helps prevent you from making poor concessions under pressure.</p><p class=\"text-gray-700 mb-4\">Another fundamental concept is the possibility of <strong>integrative negotiation</strong>, which is when you create value or \"expand the pie\" within a deal rather than simply dividing a fixed amount of pie. The key insight is that what matters a lot to you may matter less to someone else. By identifying these differences in priorities, negotiators can make strategic tradeoffs: conceding on issues that are low priority to gain on issues that are high priority. This approach transforms negotiation from a zero-sum battle into an opportunity for mutual gain, where both parties can walk away better off than if they had simply split the difference.</p>",
+  "debrief": {
+    "video_title": "Debrief: Multi-Party Negotiation",
+    "video_url": "https://customer-dxcdx06s3qk3zhto.cloudflarestream.com/726cfe7355a9dfefe0ae887131a88f6b/manifest/video.m3u8",
+    "outcome_note": "With three people at the table, coalitions and shifting majorities change everything — compare your scores and notice who ended up best and worst off.",
+    "discussion_questions": [
+      {
+        "question": "Did any two parties team up against the third?",
+        "guidance": "Talk about whether coalitions formed, how they shifted, and whether they were fair."
+      },
+      {
+        "question": "Which features created the clearest win-win trades?",
+        "guidance": "Identify a feature one party loved and another barely minded — and whether you captured that value."
+      },
+      {
+        "question": "Was anyone left out of the conversation?",
+        "guidance": "Discuss how airtime was shared and whether the quietest person got a fair deal."
+      },
+      {
+        "question": "How did you keep track of three different sets of priorities?",
+        "guidance": "Reflect on the added complexity versus a two-party negotiation."
+      },
+      {
+        "question": "If you negotiated again, how would you build trust faster?",
+        "guidance": "Name one concrete move that would help the group reach a better joint outcome."
+      }
+    ]
+  }
 }

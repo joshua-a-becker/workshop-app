@@ -11,13 +11,18 @@ export function Timer() {
   const game = useGame();
 
   // Hide (but keep occupying space, so the surrounding layout is unchanged) when
-  // we're in the negotiation stage and the configured time exceeds 5 hours.
-  const negotiateTime = game?.get("treatment")?.negotiateTime;
-  const isNegotiateStage = stage?.get("name") === "Time To Negotiate";
+  // we're in a self-paced stage and the configured time exceeds 5 hours.
+  const treatment = game?.get("treatment");
+  const stageName = stage?.get("name");
+  const stageTimeFactor =
+    stageName === "Time To Negotiate"
+      ? treatment?.negotiateTime
+      : stageName === "Debrief & Discussion"
+      ? treatment?.debriefTime
+      : undefined;
   const hideTimer =
-    isNegotiateStage &&
-    typeof negotiateTime === "number" &&
-    negotiateTime > UNLIMITED_NEGOTIATE_THRESHOLD;
+    typeof stageTimeFactor === "number" &&
+    stageTimeFactor > UNLIMITED_NEGOTIATE_THRESHOLD;
 
   let remaining;
   if (timer?.remaining || timer?.remaining === 0) {

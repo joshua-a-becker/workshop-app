@@ -33,10 +33,17 @@ const PRESENCE_SWEEP_MS = 1000;
 // lobby roster before their first `lastSeen` ever arrives.
 const NEW_JOINER_GRACE_MS = 30000;
 
+// Absolute base directory for resolving relative role-data filenames. A bundled
+// Empirica server runs from its own extract/deploy dir, so `process.cwd()` no
+// longer points at the repo and bare filenames in treatments.yaml stop resolving.
+// Anchoring against this absolute base keeps short names like
+// `roles_price_example.json` working regardless of cwd. Override with ROLE_DATA_DIR.
+const ROLE_DATA_BASE_DIR = process.env.ROLE_DATA_DIR || "/home/claude/workshop-app";
+
 // Load role data from either a remote URL (http/https) or a local file path.
-// A local path is resolved against a few likely base directories so it works
-// whether the server is launched from the project root (via `empirica`) or from
-// the server/ directory (via `cd server && npm run dev`).
+// Absolute paths are read as-is. Relative names are resolved against
+// ROLE_DATA_BASE_DIR first (survives bundling), then a few cwd-relative bases so
+// it still works when launched from the project root or the server/ directory.
 function loadRoleData(source) {
   if (/^https?:\/\//i.test(source)) {
     return JSON.parse(execSync(`curl -s "${source}"`).toString());
@@ -44,6 +51,7 @@ function loadRoleData(source) {
 
   const candidates = [
     source,
+    path.resolve(ROLE_DATA_BASE_DIR, source),
     path.resolve(process.cwd(), source),
     path.resolve(process.cwd(), "..", source),
   ];
@@ -158,9 +166,9 @@ function getTargetPlayerCount(ctx, batch) {
     return !!g.get("treatment");
   });
 
-  // Prefer a template tagged with this batch, if any; otherwise accept any.
-  const template =
-    unusedTemplates.find(g => g.get("batchID") === batch.id) || unusedTemplates[0];
+  // Only consider a template tagged with THIS batch — never a sibling batch's
+  // template, or a multi-batch (per-scenario) run would read the wrong size.
+  const template = unusedTemplates.find(g => g.get("batchID") === batch.id);
   const pc = template?.get("treatment")?.playerCount;
   if (typeof pc === "number" && pc > 0 && pc < 1000) {
     return pc;
@@ -195,6 +203,16 @@ async function createWaitingGame(ctx, batch) {
   // fits the waiting game; actual games are created later with the real size.
   const cfgPlayerCount = getTargetPlayerCount(ctx, batch);
 
+  // Per-scenario sizes so the lobby preview uses the right number for each player's
+  // scenario (a multi-treatment batch can mix 2-party and 3-party games).
+  const scenarioSizes = {};
+  for (const e of (batch.get("config")?.config?.treatments || [])) {
+    const t = e.treatment;
+    const key = t?.factors?.scenario || t?.name;
+    const pc = t?.factors?.playerCount;
+    if (key && typeof pc === "number" && pc > 0) scenarioSizes[key] = pc;
+  }
+
   // batch.addGame() returns a lightweight proxy without assignPlayer/id.
   // We create it, then look up the real Game object from the context.
   batch.addGame([
@@ -210,6 +228,7 @@ async function createWaitingGame(ctx, batch) {
     { key: "dailyRoomName", value: roomData?.roomName || null },
     { key: "dailyRoomExpiry", value: roomData?.expiry || null },
     { key: "gamePlayerCount", value: cfgPlayerCount },
+    { key: "scenarioSizes", value: scenarioSizes },
   ]);
 
   Empirica.flush();
@@ -453,10 +472,20 @@ function findExtraPlayers(groups, needed, excludeGroup, processedPlayers) {
 async function createAndAssignGame(ctx, batch, players, groupName) {
   console.log(`[ASSIGNMENT] Creating game for group "${groupName}" with ${players.length} players`);
 
-  // Get treatment from batch
-  const config = batch.get("config");
-  const treatmentEntry = config?.config?.treatments?.[0];
-  const treatment = treatmentEntry?.treatment;
+  // Pick the treatment for this game from the players' scenario (set during intro).
+  // In a single-treatment batch this is just that treatment; in a multi-treatment
+  // batch it's the one whose `scenario` factor matches. No fallback: an unresolved
+  // scenario flags the players and aborts (we never create a wrong-treatment game).
+  const scenario = players[0]?.get("scenario");
+  const treatment = getScenarioTreatment(batch, scenario);
+  if (!treatment) {
+    console.error(`[ASSIGNMENT] No treatment for scenario "${scenario}" — aborting game for group "${groupName}"`);
+    for (const p of players) {
+      p.set("scenarioError", `Unknown scenario "${scenario}". Please use the link provided for your session.`);
+    }
+    Empirica.flush();
+    return;
+  }
 
   // Snapshot existing game IDs so we can identify the newly created one
   const existingGameIds = new Set(
@@ -658,14 +687,23 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
     return;
   }
 
-  const playerCount = getTargetPlayerCount(ctx, batch);
+  // A game must be single-scenario. If the group somehow mixes scenarios, only start
+  // the admin's scenario; differently-scenario'd players stay in the lobby.
+  const startScenario = player.get("scenario");
+  const sameScenario = playersToAssign.filter(p => p.get("scenario") === startScenario);
+  if (sameScenario.length !== playersToAssign.length) {
+    console.log(`[PLAYER] Group mixes scenarios; starting only "${startScenario}" (${sameScenario.length}/${playersToAssign.length})`);
+  }
+
+  // Per-scenario game size from the matching treatment.
+  const playerCount = scenarioPlayerCount(ctx, batch, startScenario);
 
   // Mode chosen by the admin in the lobby modal. Default to "overfill"
   // (Inclusive — nobody waits) if the payload is missing or unexpected.
   const mode = requestStart.mode === "exact" ? "exact" : "overfill";
   console.log(`[PLAYER] Distributing with playerCount=${playerCount}, mode=${mode}`);
 
-  const { games: chunks, leftovers } = chunkByMode(playersToAssign, playerCount, mode);
+  const { games: chunks, leftovers } = chunkByMode(sameScenario, playerCount, mode);
 
   console.log(
     `[PLAYER] ${playersToAssign.length} players → ${chunks.length} game(s) of sizes [${chunks.map(c => c.length).join(", ")}]` +
@@ -795,39 +833,50 @@ function chunkByMode(players, P, mode) {
 // PLAYER EVENTS - Assign to waiting game and handle groupName
 // ============================================================================
 
-Empirica.on("player", async (ctx, { player }) => {
-  // Start polling on first player connection (only if auto-assignment is enabled)
-  if (!pollingStarted) {
-    globalCtx = ctx;
-    pollingStarted = true;
+// A batch may hold several treatments (one per scenario). Resolve the treatment a
+// player's `scenario` maps to: match on the treatment's `scenario` factor (fallback
+// to its name). Matching is strict for EVERY batch — including single-treatment ones,
+// which only resolve when the param matches their `scenario`/`name`. Returns null when
+// no treatment in the batch matches, so an invalid scenario can be gated everywhere.
+function getScenarioTreatment(batch, scenario) {
+  const entries = batch.get("config")?.config?.treatments || [];
+  const match = entries.find(e => {
+    const t = e.treatment;
+    return (t?.factors?.scenario || t?.name) === scenario;
+  });
+  return match?.treatment || null;
+}
 
-    if (ENABLE_AUTO_ASSIGNMENT) {
-      // Poll every minute to check for 18:00 assignment time
-      setInterval(async () => {
-        if (isAssignmentTime()) {
-          console.log("[POLLING] Assignment time reached (18:00)!");
-          await assignPlayersToGames(globalCtx);
-        }
-      }, 60000); // Check every minute
+// Per-scenario game size, from the matching treatment. Falls back to the batch
+// default when the scenario can't be resolved (so chunking still has a number).
+function scenarioPlayerCount(ctx, batch, scenario) {
+  const pc = getScenarioTreatment(batch, scenario)?.factors?.playerCount;
+  return (typeof pc === "number" && pc > 0) ? pc : getTargetPlayerCount(ctx, batch);
+}
 
-      console.log("[POLLING] Started polling for assignment time");
-    } else {
-      console.log("[POLLING] Auto-assignment disabled - using manual Start button only");
-    }
-
-    // Sweep waiting-game rosters against each player's `lastSeen` heartbeat.
-    setInterval(() => {
-      try {
-        sweepLobbyPresence(globalCtx);
-      } catch (err) {
-        console.error("[PRESENCE] Lobby sweep error:", err);
-      }
-    }, PRESENCE_SWEEP_MS);
-    console.log(`[PRESENCE] Started lobby presence sweep (every ${PRESENCE_SWEEP_MS}ms, stale >${PRESENCE_STALE_MS}ms)`);
+// Validate a player's scenario against the batch's treatments and surface an error
+// for the lobby to show (no silent fallback). Enforced for EVERY batch: the scenario
+// must map to one of the batch's treatments (matched by `scenario` factor, or name).
+function validateScenario(ctx, batch, player) {
+  const clear = () => { if (player.get("scenarioError")) player.set("scenarioError", null); };
+  const scenario = player.get("scenario");
+  if (!scenario) {
+    player.set("scenarioError", "No scenario was specified in your link. Please use the link provided for your session.");
+    return;
   }
+  if (!getScenarioTreatment(batch, scenario)) {
+    player.set("scenarioError", `Unknown scenario "${scenario}". Please use the link provided for your session.`);
+    return;
+  }
+  clear();
+}
 
-  console.log(`[PLAYER] Player ${player.id} connected`);
-
+// Assign a player to the batch's shared waiting room on connect. This does NOT
+// depend on `scenario` — Empirica gives the browser no reliable hook to set a player
+// attribute before assignment, so gating the room on the URL deadlocks. The scenario
+// is captured during intro and applied to the real game at creation time; here we
+// only validate it so the lobby can flag a missing/unknown scenario.
+async function assignToWaitingGame(ctx, player) {
   // Skip if player already assigned to a game
   if (player.get("gameID")) {
     console.log(`[PLAYER] Player ${player.id} already has gameID: ${player.get("gameID")}`);
@@ -844,43 +893,23 @@ Empirica.on("player", async (ctx, { player }) => {
   }
 
   const batch = batches[0];
-  console.log(`[PLAYER] Using batch ${batch.id}`);
+  console.log(`[PLAYER] Using batch ${batch.id} for player ${player.id}`);
 
-  // Find or create waiting game
+  // Find the batch's waiting game (create it if it doesn't exist yet).
   const allGames = Array.from(ctx.scopesByKind("game").values());
-  console.log(`[PLAYER] Total games in system: ${allGames.length}`);
-
-  // Debug: log all games and their properties
-  allGames.forEach(g => {
-    console.log(`[PLAYER] Game ${g.id}: batchID=${g.get("batchID")}, isWaiting=${g.get("isWaiting")}, hasEnded=${g.get("hasEnded")}, players=${g.players?.length || 0}`);
-  });
-
-  // First try to find waiting game by batchID
   let waitingGame = allGames.find(g =>
     g.get("batchID") === batch.id &&
     g.get("isWaiting") === true &&
     !g.get("hasEnded")
   );
 
-  // Fallback: find ANY waiting game that isn't ended (for backwards compat with existing games)
   if (!waitingGame) {
-    console.log(`[PLAYER] No waiting game found by batchID, trying fallback...`);
-    waitingGame = allGames.find(g =>
-      g.get("isWaiting") === true &&
-      !g.get("hasEnded")
-    );
-  }
-
-  console.log(`[PLAYER] Found waiting game: ${waitingGame ? waitingGame.id : 'NONE'}`);
-
-  if (!waitingGame) {
-    console.log(`[PLAYER] No waiting game found for batch ${batch.id}, creating one...`);
+    console.log(`[PLAYER] No waiting game for batch ${batch.id}, creating one...`);
     waitingGame = await createWaitingGame(ctx, batch);
-    console.log(`[PLAYER] Created waiting game: ${waitingGame ? waitingGame.id : 'FAILED'}`);
   }
 
   if (!waitingGame) {
-    console.log(`[PLAYER] Could not create waiting game for player ${player.id}`);
+    console.log(`[PLAYER] Could not obtain waiting game for player ${player.id}`);
     return;
   }
 
@@ -934,6 +963,63 @@ Empirica.on("player", async (ctx, { player }) => {
       player.set("dailyMeetingToken", token);
       Empirica.flush();
     }
+  }
+
+  // Surface a missing/unknown scenario in the lobby (the player is now in the room,
+  // so CustomLobby can render the error). Only matters for multi-treatment batches.
+  validateScenario(ctx, batch, player);
+  Empirica.flush();
+}
+
+Empirica.on("player", async (ctx, { player }) => {
+  // Start polling on first player connection (only if auto-assignment is enabled)
+  if (!pollingStarted) {
+    globalCtx = ctx;
+    pollingStarted = true;
+
+    if (ENABLE_AUTO_ASSIGNMENT) {
+      // Poll every minute to check for 18:00 assignment time
+      setInterval(async () => {
+        if (isAssignmentTime()) {
+          console.log("[POLLING] Assignment time reached (18:00)!");
+          await assignPlayersToGames(globalCtx);
+        }
+      }, 60000); // Check every minute
+
+      console.log("[POLLING] Started polling for assignment time");
+    } else {
+      console.log("[POLLING] Auto-assignment disabled - using manual Start button only");
+    }
+
+    // Sweep waiting-game rosters against each player's `lastSeen` heartbeat.
+    setInterval(() => {
+      try {
+        sweepLobbyPresence(globalCtx);
+      } catch (err) {
+        console.error("[PRESENCE] Lobby sweep error:", err);
+      }
+    }, PRESENCE_SWEEP_MS);
+    console.log(`[PRESENCE] Started lobby presence sweep (every ${PRESENCE_SWEEP_MS}ms, stale >${PRESENCE_STALE_MS}ms)`);
+  }
+
+  console.log(`[PLAYER] Player ${player.id} connected`);
+
+  await assignToWaitingGame(ctx, player);
+});
+
+// When a player's scenario arrives/changes (set during intro), (re)validate it so
+// the lobby can flag a missing/unknown scenario. The scenario is applied to the real
+// game at creation time, not here — so no (re)assignment is needed.
+Empirica.on("player", "scenario", async (ctx, { player }) => {
+  console.log(`[PLAYER] Player ${player.id} set scenario to: ${player.get("scenario")}`);
+  const gameId = player.get("gameID");
+  if (!gameId) return;
+  const game = Array.from(ctx.scopesByKind("game").values()).find(g => g.id === gameId);
+  const batch = game && Array.from(ctx.scopesByKind("batch").values())
+    .find(b => b.id === game.get("batchID"));
+  if (batch) {
+    validateScenario(ctx, batch, player);
+    Empirica.flush();
   }
 });
 
@@ -1030,6 +1116,12 @@ Empirica.on("player", "introDone", async (ctx, { player }) => {
 // ============================================================================
 
 Empirica.onRoundEnded(({ round }) => {
+  // Only the negotiation round produces a score. Later rounds (e.g. the Debrief
+  // round) also fire this callback, and must NOT overwrite the computed bonus.
+  if (round.get("name") !== "Negotiation Game") {
+    return;
+  }
+
   const game = round.currentGame;
   const history = round.get("proposalHistory") || [];
   const finalProposal = history.length > 0 ? history[history.length - 1] : null;
@@ -1085,6 +1177,9 @@ Empirica.onRoundEnded(({ round }) => {
     }
 
     player.set("bonus", bonus);
+    // Persist the agreement flag per-player so the post-negotiation Debrief stage
+    // can show the correct outcome without re-deriving it from the bonus.
+    player.set("reachedAgreement", reachedAgreement);
     console.log(`Player ${player.id} bonus: ${bonus} (agreement: ${reachedAgreement})`);
   });
 
@@ -1114,6 +1209,10 @@ Empirica.onGameStart(({ game }) => {
 
   // Store tips in game state for client access
   game.set("tips", rolesData.tips || "");
+
+  // Store post-negotiation debrief content (discussion questions + debrief video)
+  // for the client. Shared across all roles, like tips.
+  game.set("debrief", rolesData.debrief || {});
 
   // Price negotiations carry a scenario-level display config (label, prefix, …).
   if (negotiationType === "price") {
@@ -1216,6 +1315,7 @@ Empirica.onGameStart(({ game }) => {
 
   const readRoleTime = game.get("treatment")?.readRoleTime ?? 300;
   const negotiateTime = game.get("treatment")?.negotiateTime ?? 1800;
+  const debriefTime = game.get("treatment")?.debriefTime ?? 1800;
 
 
   // Randomly assign roles to players
@@ -1276,6 +1376,18 @@ Empirica.onGameStart(({ game }) => {
   round.addStage({
     name: "Time To Negotiate",
     duration: negotiateTime,
+  });
+
+  // ROUND 2 -- Post-negotiation debrief. A separate round so the negotiation
+  // round can end first (computing each player's bonus in onRoundEnded) before
+  // the Debrief stage shows the outcome, discussion questions, and debrief video.
+  const debriefRound = game.addRound({
+    name: "Debrief",
+  });
+
+  debriefRound.addStage({
+    name: "Debrief & Discussion",
+    duration: debriefTime,
   });
 
   console.log("game started?")

@@ -23,5 +23,32 @@
       "rp": 12000
     }
   ],
-  "tips": "<p class=\"text-gray-700 mb-4\">In a single-issue price negotiation, the key concepts are your <strong>reservation price</strong> and the <strong>ZOPA</strong> (Zone of Possible Agreement).</p><p>Your <strong>reservation price</strong> is the worst price you'd still accept — the point where the deal is no better than your <strong>BATNA</strong> (Best Alternative to a Negotiated Agreement). A buyer should never pay more than their reservation price; a seller should never accept less than theirs.</p><p>The <strong>ZOPA</strong> is the range of prices acceptable to both sides — it exists only when the buyer's maximum is above the seller's minimum. Any price inside the ZOPA is better than no deal for both parties; how the surplus is split is what you're negotiating over.</p><p class=\"text-gray-700 mb-4\">The number one rule still holds: <strong>never accept a deal worse than your BATNA</strong>. Here, your \"value\" is your surplus relative to your reservation price, so never accept a deal worth less than 0.</p>"
+  "tips": "<p class=\"text-gray-700 mb-4\">In a single-issue price negotiation, the key concepts are your <strong>reservation price</strong> and the <strong>ZOPA</strong> (Zone of Possible Agreement).</p><p>Your <strong>reservation price</strong> is the worst price you'd still accept — the point where the deal is no better than your <strong>BATNA</strong> (Best Alternative to a Negotiated Agreement). A buyer should never pay more than their reservation price; a seller should never accept less than theirs.</p><p>The <strong>ZOPA</strong> is the range of prices acceptable to both sides — it exists only when the buyer's maximum is above the seller's minimum. Any price inside the ZOPA is better than no deal for both parties; how the surplus is split is what you're negotiating over.</p><p class=\"text-gray-700 mb-4\">The number one rule still holds: <strong>never accept a deal worse than your BATNA</strong>. Here, your \"value\" is your surplus relative to your reservation price, so never accept a deal worth less than 0.</p>",
+  "debrief": {
+    "video_title": "Debrief: Anchoring and the ZOPA",
+    "video_url": "https://customer-dxcdx06s3qk3zhto.cloudflarestream.com/726cfe7355a9dfefe0ae887131a88f6b/manifest/video.m3u8",
+    "outcome_note": "The buyer and seller had opposite goals here — compare how the final price split the surplus between you.",
+    "discussion_questions": [
+      {
+        "question": "Where did the final price land within the ZOPA?",
+        "guidance": "The seller's reservation price was $12,000 and the buyer's was $20,000 — discuss who captured more of that $8,000 of surplus."
+      },
+      {
+        "question": "Who made the first offer, and how aggressive was it?",
+        "guidance": "Talk about whether the opening anchor pulled the final price toward the person who made it."
+      },
+      {
+        "question": "Did you reveal your reservation price, intentionally or by accident?",
+        "guidance": "Discuss how much information each side gave away and what it cost them."
+      },
+      {
+        "question": "Did either party threaten to walk away, and was it credible?",
+        "guidance": "Explore how invoking your BATNA changed the other side's behavior."
+      },
+      {
+        "question": "Knowing the ZOPA now, what would your opening offer have been?",
+        "guidance": "Be concrete about a number and the reasoning behind it."
+      }
+    ]
+  }
 }

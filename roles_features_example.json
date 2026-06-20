@@ -66,5 +66,32 @@
       }
     }
   ],
-  "tips": "<p class=\"text-gray-700 mb-4\">This is a <strong>features</strong> negotiation: for each term you jointly decide to <strong>include</strong> it or <strong>exclude</strong> it. Each term is worth a different amount to each side, which opens the door to <strong>integrative</strong> (\"win-win\") deals.</p><p>Look for <strong>logrolling</strong> opportunities — concede on a term that costs you little to gain one you value highly. A term that one party loves and the other barely minds should usually be <em>included</em>; a term that costs one party a lot and helps the other only a little should usually be <em>excluded</em>. Don't treat every term as a fight.</p><p>Always keep your <strong>BATNA</strong> in mind: never accept a total package worth less than 0 to you. Aim for the set of include/exclude choices that grows the total value for both sides.</p>"
+  "tips": "<p class=\"text-gray-700 mb-4\">This is a <strong>features</strong> negotiation: for each term you jointly decide to <strong>include</strong> it or <strong>exclude</strong> it. Each term is worth a different amount to each side, which opens the door to <strong>integrative</strong> (\"win-win\") deals.</p><p>Look for <strong>logrolling</strong> opportunities — concede on a term that costs you little to gain one you value highly. A term that one party loves and the other barely minds should usually be <em>included</em>; a term that costs one party a lot and helps the other only a little should usually be <em>excluded</em>. Don't treat every term as a fight.</p><p>Always keep your <strong>BATNA</strong> in mind: never accept a total package worth less than 0 to you. Aim for the set of include/exclude choices that grows the total value for both sides.</p>",
+  "debrief": {
+    "video_title": "Debrief: Creating Value Through Logrolling",
+    "video_url": "https://customer-dxcdx06s3qk3zhto.cloudflarestream.com/726cfe7355a9dfefe0ae887131a88f6b/manifest/video.m3u8",
+    "outcome_note": "Compare your score with the others in your group — and remember that a higher combined total means you left less value on the table.",
+    "discussion_questions": [
+      {
+        "question": "Which terms did you end up including, and which did you exclude?",
+        "guidance": "Walk through the final package together and check whether each choice actually reflected who valued that term most."
+      },
+      {
+        "question": "Did you trade a low-value term for a high-value one (logrolling)?",
+        "guidance": "Identify at least one term you conceded cheaply to win one you cared about — or one you wish you had."
+      },
+      {
+        "question": "How early did you share your priorities, and did it help or hurt you?",
+        "guidance": "Discuss the tension between revealing what you want and protecting your position."
+      },
+      {
+        "question": "Did either side accept a package close to their BATNA?",
+        "guidance": "Talk about whether anyone risked taking a deal worth less than walking away."
+      },
+      {
+        "question": "If you ran this again, what one thing would you do differently?",
+        "guidance": "Be specific — a behavior, not just \"negotiate better.\""
+      }
+    ]
+  }
 }

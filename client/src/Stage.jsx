@@ -8,6 +8,7 @@ import React from "react";
 import { ReadRole } from "./components/ReadRole";
 import { ReadyToNegotiate } from "./components/ReadyToNegotiate";
 import { VideoNegotiate } from "./components/VideoNegotiate";
+import { VideoDebrief } from "./components/VideoDebrief";
 
 export function Stage({ profileComponent }) {
   const player = usePlayer();
@@ -39,6 +40,10 @@ export function Stage({ profileComponent }) {
 
   if (stageName === "Time To Negotiate") {
     return <VideoNegotiate profileComponent={profileComponent} />;
+  }
+
+  if (stageName === "Debrief & Discussion") {
+    return <VideoDebrief profileComponent={profileComponent} />;
   }
 
   // Default fallback

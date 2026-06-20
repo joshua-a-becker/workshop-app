@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useMemo, useRef } from "react";
-import { Users, Video, Play, X, User } from "lucide-react";
+import { Users, Video, Play, X, User, AlertTriangle } from "lucide-react";
 import { usePlayer, useGame } from "@empirica/core/player/classic/react";
 import { DailyCallContext } from "../App.jsx";
 import { VideoChat } from "../components/VideoChat.jsx";
@@ -84,7 +84,42 @@ const ASSIGNMENT_MODES = [
   },
 ];
 
+// Shown when a player has no scenario in their link, or the server flagged the
+// scenario as invalid. Rendered instead of the lobby — these players are never
+// assigned to a game, so they never reach the exit steps.
+function ScenarioErrorPanel({ message }) {
+  return (
+    <div className="h-screen w-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="flex justify-center mb-4">
+          <AlertTriangle className="w-12 h-12 text-amber-500" strokeWidth={1.5} />
+        </div>
+        <h2 className="text-xl font-semibold text-center text-gray-900 mb-2">
+          Can't join this session
+        </h2>
+        <p className="text-center text-gray-600">{message}</p>
+      </div>
+    </div>
+  );
+}
+
+// Thin wrapper: validate the player's scenario before rendering the lobby. This
+// keeps the guard out of CustomLobbyInner's hook list (the wrapper only ever calls
+// usePlayer), so the Rules of Hooks are respected across renders.
 export function CustomLobby() {
+  const player = usePlayer();
+  // The server validates the scenario against the batch's treatments and sets
+  // `scenarioError` when it's missing/unknown (only for multi-treatment batches).
+  const scenarioError = player?.get("scenarioError");
+
+  if (scenarioError) {
+    return <ScenarioErrorPanel message={scenarioError} />;
+  }
+
+  return <CustomLobbyInner />;
+}
+
+function CustomLobbyInner() {
   const player = usePlayer();
   const game = useGame();
 
@@ -121,8 +156,11 @@ export function CustomLobby() {
   const canStartGame = isAdmin && totalGroupMembers >= 2;
 
   // Real per-game size, surfaced by the server on the waiting game so the
-  // lobby can preview how the group would be split.
-  const gamePlayerCount = game?.get("gamePlayerCount") || 4;
+  // lobby can preview how the group would be split. In a multi-treatment batch
+  // the size depends on the player's scenario, so prefer the per-scenario value.
+  const myScenario = player?.get("scenario");
+  const scenarioSizes = game?.get("scenarioSizes") || {};
+  const gamePlayerCount = scenarioSizes[myScenario] || game?.get("gamePlayerCount") || 4;
 
   // Find the admin's display name (if admin is someone other than the current player)
   const adminName = adminId && !isAdmin
