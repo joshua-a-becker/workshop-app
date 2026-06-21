@@ -29,6 +29,9 @@ factors:
         - value: roles_features_example.json
         - value: roles_multiplechoice_example.json
         - value: roles_price_example.json
+        - value: https://app.negotiation.education/api/roles/features_example.json
+        - value: https://app.negotiation.education/api/roles/price_example.json
+        - value: https://app.negotiation.education/api/roles/multiplechoice_example.json
 treatments:
     - name: features_example
       desc: Two-party apartment lease, include/exclude features (local file)
@@ -36,18 +39,18 @@ treatments:
         negotiateTime: 1800
         playerCount: 2
         readRoleTime: 300
-        roleDataURL: roles_features_example.json
-    - name: multiplechoice_example
-      desc: Two-party job offer, one dropdown per issue (local file)
-      factors:
-        negotiateTime: 1800
-        playerCount: 2
-        readRoleTime: 300
-        roleDataURL: roles_multiplechoice_example.json
+        roleDataURL: https://app.negotiation.education/api/roles/features_example.json
     - name: price_example
       desc: Two-party used-car sale, single price box (local file)
       factors:
         negotiateTime: 1800
         playerCount: 2
         readRoleTime: 300
-        roleDataURL: roles_price_example.json
+        roleDataURL: https://app.negotiation.education/api/roles/price_example.json
+    - name: multiplechoice_example
+      desc: Two-party job offer, one dropdown per issue (local file)
+      factors:
+        negotiateTime: 1800
+        playerCount: 2
+        readRoleTime: 300
+        roleDataURL: https://app.negotiation.education/api/roles/multiplechoice_example.json

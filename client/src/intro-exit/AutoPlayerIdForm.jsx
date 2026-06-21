@@ -10,8 +10,25 @@ export function AutoPlayerIdForm({ onPlayerID }) {
     // Scenario routing key (e.g. ?scenario=price_example). The server uses this
     // to route the player to the matching batch's waiting room. Empty if absent.
     const scenarioFromUrl = paramsObj?.scenario || "";
+    // Club user id, passed directly as ?uid=. Replaces the old practice of
+    // decoding it out of participantKey (strip 12-digit stamp).
+    const uidFromUrl = paramsObj?.uid || "";
 
     const player = usePlayer();
+
+    // [DIAG] Capture the Empirica player identity as soon as it resolves, plus any
+    // pre-existing gameID (a stale gameID on a stable authed ns is a prime suspect).
+    useEffect(() => {
+      if (!player) return;
+      console.log("[DIAG][autoid] player resolved", {
+        playerId: player.id,
+        gameID: player.get("gameID"),
+        ended: player.get("ended"),
+        participantKey: playerIdFromUrl,
+        groupName: groupNameFromUrl,
+        scenario: scenarioFromUrl,
+      });
+    }, [player?.id]);
 
     useEffect(() => {
       onPlayerID(playerIdFromUrl);
@@ -27,6 +44,10 @@ export function AutoPlayerIdForm({ onPlayerID }) {
         console.log(`[AutoPlayerIdForm] Setting scenario to "${scenarioFromUrl}" on player ${player.id}`);
         player.set("scenario", scenarioFromUrl);
       }
-    }, [player, groupNameFromUrl, scenarioFromUrl]);
+      if (player && uidFromUrl) {
+        console.log(`[AutoPlayerIdForm] Setting uid to "${uidFromUrl}" on player ${player.id}`);
+        player.set("uid", uidFromUrl);
+      }
+    }, [player, groupNameFromUrl, scenarioFromUrl, uidFromUrl]);
 
   }

@@ -10,6 +10,9 @@ import { usePlayer } from "@empirica/core/player/classic/react";
 // the scenario's treatment at game creation. This component just records any params
 // it can and proceeds.
 export function ConsentUrlRouter({ onConsent }) {
+
+  console.log("HERE!!")
+  
   const player = usePlayer();
 
   useEffect(() => {

@@ -528,6 +528,13 @@ async function createAndAssignGame(ctx, batch, players, groupName) {
   }
 
   console.log(`[ASSIGNMENT] Found real Game object: ${game.id}`);
+  console.log(`[DIAG][createGame] new game`, {
+    gameId: game.id,
+    groupName,
+    treatmentName: treatment?.name,
+    isWaiting: game.get("isWaiting"),
+    players: players.map(p => p.id),
+  });
 
   // Assign players to game
   for (const player of players) {
@@ -544,6 +551,11 @@ async function createAndAssignGame(ctx, batch, players, groupName) {
   Empirica.flush();
 
   console.log(`[ASSIGNMENT] Game ${game.id} started with ${players.length} players`);
+  console.log(`[DIAG][createGame] start=true set`, {
+    gameId: game.id,
+    groupName,
+    assignedPlayers: players.map(p => ({ id: p.id, gameID: p.get("gameID") })),
+  });
 }
 
 // ============================================================================
@@ -593,6 +605,12 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
   const requestingPlayerId = player.id;
 
   console.log(`[PLAYER] Start requested for group "${groupName}" by player ${requestingPlayerId}`);
+  console.log(`[DIAG][requestStart] received`, {
+    requestingPlayerId,
+    requestStart,
+    gameID: player.get("gameID"),
+    scenario: player.get("scenario"),
+  });
 
   // Get the waiting game for this player
   const gameId = player.get("gameID");
@@ -617,6 +635,13 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
 
   // Verify requester is admin
   const groupAdmins = game.get("groupAdmins") || {};
+  console.log(`[DIAG][requestStart] admin check`, {
+    groupName,
+    adminForGroup: groupAdmins[groupName],
+    requestingPlayerId,
+    isAdmin: groupAdmins[groupName] === requestingPlayerId,
+    rosterIds: Object.keys(game.get("waitingPlayers") || {}),
+  });
   if (groupAdmins[groupName] !== requestingPlayerId) {
     console.log(`[PLAYER] Player ${requestingPlayerId} is not admin of group "${groupName}", ignoring`);
     player.set("requestStart", null);
@@ -704,6 +729,15 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
   console.log(`[PLAYER] Distributing with playerCount=${playerCount}, mode=${mode}`);
 
   const { games: chunks, leftovers } = chunkByMode(sameScenario, playerCount, mode);
+  console.log(`[DIAG][requestStart] chunked`, {
+    startScenario,
+    playerCount,
+    mode,
+    playersToAssign: playersToAssign.map(p => p.id),
+    sameScenario: sameScenario.map(p => p.id),
+    chunkSizes: chunks.map(c => c.length),
+    leftovers: leftovers.map(p => p.id),
+  });
 
   console.log(
     `[PLAYER] ${playersToAssign.length} players → ${chunks.length} game(s) of sizes [${chunks.map(c => c.length).join(", ")}]` +
@@ -879,7 +913,17 @@ function validateScenario(ctx, batch, player) {
 async function assignToWaitingGame(ctx, player) {
   // Skip if player already assigned to a game
   if (player.get("gameID")) {
-    console.log(`[PLAYER] Player ${player.id} already has gameID: ${player.get("gameID")}`);
+    const existingId = player.get("gameID");
+    const existing = Array.from(ctx.scopesByKind("game").values()).find(g => g.id === existingId);
+    console.log(`[PLAYER] Player ${player.id} already has gameID: ${existingId}`);
+    console.log(`[DIAG][assign] EARLY RETURN - player has gameID`, {
+      playerId: player.id,
+      gameID: existingId,
+      foundGame: !!existing,
+      isWaiting: existing?.get("isWaiting"),
+      hasEnded: existing?.get("hasEnded"),
+      groupName: existing?.get("groupName"),
+    });
     return;
   }
 
@@ -952,6 +996,13 @@ async function assignToWaitingGame(ctx, player) {
 
   Empirica.flush();
   console.log(`[PLAYER] Updated waitingPlayers on game, now ${Object.keys(waitingPlayers).length} players`);
+  console.log(`[DIAG][assign] assigned to waiting game`, {
+    playerId: player.id,
+    waitingGameId: waitingGame.id,
+    groupName: playerGroupName,
+    rosterIds: Object.keys(waitingPlayers),
+    groupAdmins,
+  });
 
   // Create meeting token for player if room exists
   const roomName = waitingGame.get("dailyRoomName");
@@ -1003,6 +1054,14 @@ Empirica.on("player", async (ctx, { player }) => {
   }
 
   console.log(`[PLAYER] Player ${player.id} connected`);
+  console.log(`[DIAG][connect] player connected`, {
+    playerId: player.id,
+    gameID: player.get("gameID"),
+    scenario: player.get("scenario"),
+    groupName: player.get("groupName"),
+    displayName: player.get("displayName"),
+    ended: player.get("ended"),
+  });
 
   await assignToWaitingGame(ctx, player);
 });
@@ -1193,6 +1252,13 @@ Empirica.onGameStart(({ game }) => {
   const treatment = game.get("treatment");
   const roleDataURL = treatment?.roleDataURL;
   console.log(`[GAME START] Game ${game.id} treatment:`, JSON.stringify(treatment));
+  console.log(`[DIAG][gameStart]`, {
+    gameId: game.id,
+    groupName: game.get("groupName"),
+    isWaiting: game.get("isWaiting"),
+    players: (game.players || []).map(p => p.id),
+    roleDataURL,
+  });
 
   if (!roleDataURL) {
     console.error(`[GAME START] Game ${game.id} has no roleDataURL in treatment — cannot fetch roles`);

@@ -5,11 +5,13 @@
 
 set -e  # Exit on any error
 
-IP_ADDRESS="167.99.161.107"
+IP_ADDRESS="161.35.167.139"
 SSH_KEY_PATH="$HOME/.ssh/id_rsa"
 BUNDLE_FILENAME="VideoChatApp.tar.zst"
 REMOTE_USER="root" 
 
+# don't overwrite the remote treament [does overwrite local!]
+scp -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$REMOTE_USER@$IP_ADDRESS:/root/.empirica/treatments.yaml" .empirica/treatments.yaml
 
 echo "Deploying to $IP_ADDRESS..."
 

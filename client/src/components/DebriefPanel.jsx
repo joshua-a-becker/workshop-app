@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { usePlayer, useGame } from "@empirica/core/player/classic/react";
+import { saveExerciseNote } from "../clubApi";
 
 // Turn a Cloudflare Stream HLS manifest URL into the minimal iframe player URL.
 //   https://customer-xxx.cloudflarestream.com/<id>/manifest/video.m3u8
@@ -17,6 +18,7 @@ const TABS = [
   { id: "outcome", label: "Outcome" },
   { id: "discussion", label: "Discussion Questions" },
   { id: "video", label: "Debrief Video" },
+  { id: "notes", label: "Your Notes" },
 ];
 
 export function DebriefPanel() {
@@ -28,6 +30,8 @@ export function DebriefPanel() {
   const debrief = game.get("debrief") || {};
   const questions = debrief.discussion_questions || [];
   const embedUrl = toEmbedUrl(debrief.video_url || "");
+
+  const scenario = player.get("scenario") || "";
 
   const bonus = player.get("bonus") || 0;
   // Set per-player in onRoundEnded; fall back to the score for older games.
@@ -74,8 +78,14 @@ export function DebriefPanel() {
         )}
 
         {activeTab === "video" && (
-          <VideoTab embedUrl={embedUrl} title={debrief.video_title} />
+          <VideoTab
+            embedUrl={embedUrl}
+            title={debrief.video_title}
+            onProceed={() => setActiveTab("notes")}
+          />
         )}
+
+        {activeTab === "notes" && <NotesTab scenario={scenario} />}
       </div>
     </div>
   );
@@ -182,7 +192,7 @@ function DiscussionTab({ questions, onProceed }) {
   );
 }
 
-function VideoTab({ embedUrl, title }) {
+function VideoTab({ embedUrl, title, onProceed }) {
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-lg shadow-md p-6">
@@ -209,8 +219,116 @@ function VideoTab({ embedUrl, title }) {
           </p>
         )}
       </div>
+
+      <ProceedButton onClick={onProceed}>Proceed to Your Notes</ProceedButton>
     </div>
   );
+}
+
+// Save at most once per this interval while typing (plus once on unmount), so we
+// never hit the server on every keystroke.
+const SAVE_DEBOUNCE_MS = 3000;
+
+function NotesTab({ scenario }) {
+  const player = usePlayer();
+  // Seed from the player attribute so the note survives a page reload (Empirica
+  // rehydrates player state on reconnect). The remote club save is the durable
+  // copy; this is the local/offline-resilient draft.
+  const initial = player.get("exerciseNote") || "";
+  const [note, setNote] = useState(initial);
+  // "idle" | "editing" | "saving" | "saved" | "error"
+  const [status, setStatus] = useState("idle");
+  const timerRef = useRef(null);
+  // Latest text + last-saved text live in refs so the debounce timer always
+  // reads current values without restarting on every keystroke.
+  const noteRef = useRef(initial);
+  const savedRef = useRef(initial);
+
+  // Persist the current draft: write the player attribute (survives reload/tab
+  // change) and the remote club save. Called at most once per SAVE_DEBOUNCE_MS,
+  // plus once on unmount — never on every keystroke.
+  const flush = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    const current = noteRef.current;
+    if (current === savedRef.current) return; // nothing new to persist
+    savedRef.current = current;
+    player.set("exerciseNote", current);
+    setStatus("saving");
+    saveExerciseNote(scenario, current)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        // Don't flip to "saved" if the user kept typing while we were saving.
+        setStatus(noteRef.current === current ? "saved" : "editing");
+      })
+      .catch(() => setStatus("error"));
+  };
+
+  const handleChange = (e) => {
+    const value = e.target.value;
+    setNote(value);
+    noteRef.current = value;
+    setStatus("editing");
+    // Throttle: schedule a save only if one isn't already pending, so a burst of
+    // typing produces at most one save per SAVE_DEBOUNCE_MS.
+    if (!timerRef.current) {
+      timerRef.current = setTimeout(flush, SAVE_DEBOUNCE_MS);
+    }
+  };
+
+  // Flush any pending edits when the component unmounts (e.g. tab switch).
+  useEffect(() => {
+    return () => flush();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h3 className="text-2xl font-bold text-gray-900 mb-2">Your Notes</h3>
+        <p className="text-gray-700 mb-4">
+          Please enter any notes you'd like to save about this exercise. Enter at
+          least 1 thing you did well, and 1 thing you'd do differently next time.
+        </p>
+
+        <textarea
+          value={note}
+          onChange={handleChange}
+          rows={10}
+          placeholder="Type your notes here…"
+          className="w-full rounded-lg border border-gray-300 p-4 text-gray-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 resize-y"
+        />
+
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-sm text-gray-500 italic">
+            This note will be saved to your profile.
+          </p>
+          <SaveIndicator status={status} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SaveIndicator({ status }) {
+  switch (status) {
+    case "editing":
+      return <span className="text-sm text-gray-400">Editing…</span>;
+    case "saving":
+      return <span className="text-sm text-gray-400">Saving…</span>;
+    case "saved":
+      return <span className="text-sm text-green-600">✓ Saved</span>;
+    case "error":
+      return (
+        <span className="text-sm text-red-600">
+          Couldn't save — check your connection
+        </span>
+      );
+    default:
+      return null;
+  }
 }
 
 function ProceedButton({ onClick, children }) {

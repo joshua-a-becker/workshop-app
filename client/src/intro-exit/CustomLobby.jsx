@@ -178,34 +178,73 @@ function CustomLobbyInner() {
   const hasVideoRoom = game?.get("roomUrl") && player?.get("dailyMeetingToken");
   const hasCompletedIntro = player?.get("introDone");
 
+  // [DIAG] Full lobby snapshot every render: who am I, what game am I attached to,
+  // am I admin, and the roster the client sees.
+  console.log("[DIAG][lobby] render", {
+    playerId: player?.id,
+    gameID: player?.get("gameID"),
+    lobbyGameId: game?.id,
+    isWaitingGame: game?.get("isWaiting"),
+    ended: player?.get("ended"),
+    introDone: player?.get("introDone"),
+    scenario: player?.get("scenario"),
+    myGroupName,
+    adminId,
+    isAdmin,
+    totalGroupMembers,
+    canStartGame,
+    rosterIds: Object.keys(waitingPlayersObj),
+  });
+
+  // [DIAG] Capture the exact moment the client's game attachment changes (or never
+  // does). If gameID/lobbyGameId/isWaiting never change after Confirm, the
+  // lobby→game transition is the failure.
+  useEffect(() => {
+    console.log("[DIAG][lobby] attachment changed", {
+      playerId: player?.id,
+      gameID: player?.get("gameID"),
+      lobbyGameId: game?.id,
+      isWaitingGame: game?.get("isWaiting"),
+    });
+  }, [player?.get("gameID"), game?.id, game?.get("isWaiting")]);
+
+  // [DIAG] Mount/unmount of the lobby itself.
+  useEffect(() => {
+    console.log("[DIAG][lobby] CustomLobby MOUNTED", { playerId: player?.id });
+    return () => console.log("[DIAG][lobby] CustomLobby UNMOUNTED", { playerId: player?.id });
+  }, []);
+
   // Assignment-mode modal state. Clicking Start opens the modal; the admin
   // picks a mode; Confirm sends the mode along with requestStart.
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [selectedMode, setSelectedMode] = useState("overfill");
 
   const openAssignmentModal = () => {
+    console.log("[DIAG][lobby] openAssignmentModal click", {
+      playerId: player?.id, isAdmin, hasGame: !!game, hasPlayer: !!player,
+    });
     if (!isAdmin || !game || !player) {
-      console.warn("[CustomLobby] Cannot start - not admin or no game/player");
+      console.warn("[DIAG][lobby] openAssignmentModal BLOCKED - not admin or no game/player");
       return;
     }
     setShowAssignmentModal(true);
   };
 
   const confirmStartGame = (mode) => {
-    if (!isAdmin || !game || !player) return;
-
-    console.log("[CustomLobby] Setting requestStart on player:", {
-      playerId: player.id,
-      groupName: myGroupName,
-      mode,
+    console.log("[DIAG][lobby] confirmStartGame click", {
+      playerId: player?.id, isAdmin, gameId: game?.id, gameID: player?.get("gameID"), mode,
     });
+    if (!isAdmin || !game || !player) {
+      console.warn("[DIAG][lobby] confirmStartGame BLOCKED - not admin or no game/player");
+      return;
+    }
+
+    const payload = { groupName: myGroupName, timestamp: Date.now(), mode };
+    console.log("[DIAG][lobby] setting requestStart", payload);
 
     // Set attribute on PLAYER instead of game (game attribute listeners don't work in Empirica)
-    player.set("requestStart", {
-      groupName: myGroupName,
-      timestamp: Date.now(),
-      mode,
-    });
+    player.set("requestStart", payload);
+    console.log("[DIAG][lobby] requestStart set, value now:", player.get("requestStart"));
 
     setShowAssignmentModal(false);
   };

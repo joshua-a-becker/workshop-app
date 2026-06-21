@@ -5,7 +5,7 @@
 
 set -e  # Exit on any error
 
-IP_ADDRESS="167.99.161.107"
+IP_ADDRESS="161.35.167.139"
 SSH_KEY_PATH="$HOME/.ssh/id_rsa"
 BUNDLE_FILENAME="VideoChatApp.tar.zst"
 REMOTE_USER="root" 
@@ -28,15 +28,18 @@ EOF
 ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$REMOTE_USER@$IP_ADDRESS" 'sudo bash -s' < ./setup_service.sh
 
 
-# download logs
-# scp -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$REMOTE_USER@$IP_ADDRESS:~/empirica.log" .
-
 # set caddyfile
-# ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$REMOTE_USER@$IP_ADDRESS" 'sudo bash -s' < ./setup-caddy.sh
+ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$REMOTE_USER@$IP_ADDRESS" 'sudo bash -s' < ./setup-caddy.sh
 
 
 # check caddyfile
-# ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$REMOTE_USER@$IP_ADDRESS" cat /etc/caddy/Caddyfile
+ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$REMOTE_USER@$IP_ADDRESS" cat /etc/caddy/Caddyfile
+
+## UTILITIES
+
+
+# download logs
+# scp -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$REMOTE_USER@$IP_ADDRESS:~/empirica.log" .
 
 
 # update caddyfile

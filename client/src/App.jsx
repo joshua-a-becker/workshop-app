@@ -13,6 +13,9 @@ import CustomConsent from './intro-exit/CustomConsent.jsx';
 import { Introduction } from './intro-exit/Introduction.jsx';
 import { NegotiationOutcome } from './intro-exit/NegotiationOutcome.jsx';
 import DailyIframe from "@daily-co/daily-js";
+import { CLUB_BASE, clubUid } from "./clubApi";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { EmpiricaDiagnostic } from "./components/EmpiricaDiagnostic";
 
 // Create context for Daily.co call management (includes media stream)
 export const DailyCallContext = createContext(null);
@@ -92,6 +95,9 @@ export default function App() {
   // GroupName from URL or state (for form entry)
   const [groupName, setGroupName] = useState(urlParams.get("groupName") || "");
 
+  // Club login/identity gate state: "pending" | "ok" | "loggedOut" | "error"
+  const [auth, setAuth] = useState({ status: "pending" });
+
   // Daily.co call state management
   const [mediaStream, setMediaStream] = useState(null);
   const callObjectRef = useRef(null);
@@ -130,6 +136,10 @@ export default function App() {
   let playerKey = urlParams.get("participantKey") || "";
   let scenarioId = urlParams.get("scenario") || "";
   const devKey = urlParams.get("devKey") || "";
+  // Club UID passed directly as ?uid=. Preferred over decoding it out of
+  // participantKey (the old clubUid() stamp-strip, which is unreliable).
+  const uidFromUrl = urlParams.get("uid") || "";
+  const expectedUid = uidFromUrl || clubUid(playerKey);
 
   // If studentId is present, generate participantKey from it
   const studentId = urlParams.get("studentId");
@@ -168,8 +178,40 @@ export default function App() {
   };
 
   // Flags for conditional rendering (no early returns!)
-  const showInvalidURL = !playerKey || !scenarioId;
+  const showInvalidURL = !playerKey || !scenarioId || !uidFromUrl;
   const showGroupNameEntry = playerKey && !groupName;
+
+  // Verify the participant is logged into the club AND that the URL's
+  // participantKey matches their club UID before letting them into the app.
+  useEffect(() => {
+    if (!playerKey) return; // Invalid-URL screen handles the missing-key case
+    // Dev passthrough: ?devKey=oandi grants access without a login cookie or
+    // UID match. An otherwise-valid URL (participantKey + scenario) is still
+    // required — only the club identity check is skipped.
+    if (devKey === "oandi") {
+      console.log("[DIAG][auth] devKey bypass → ok", { playerKey });
+      setAuth({ status: "ok", userId: playerKey, mismatch: false });
+      return;
+    }
+    let cancelled = false;
+    console.log("[DIAG][auth] whoami fetch start", { CLUB_BASE, playerKey });
+    fetch(`${CLUB_BASE}/api/whoami`, { credentials: "include" })
+      .then((r) => r.json())
+      .then(({ userId }) => {
+        if (cancelled) return;
+        console.log("[DIAG][auth] whoami result", { userId, playerKey, expectedUid, mismatch: userId !== expectedUid });
+        if (!userId) {
+          // Not logged in → send to club login, then return here.
+          window.location.href =
+            `${CLUB_BASE}/home?next=` + encodeURIComponent(window.location.href);
+          setAuth({ status: "loggedOut" });
+        } else {
+          setAuth({ status: "ok", userId, mismatch: userId !== expectedUid });
+        }
+      })
+      .catch((e) => { console.log("[DIAG][auth] whoami error", e); if (!cancelled) setAuth({ status: "error" }); });
+    return () => { cancelled = true; };
+  }, [playerKey, devKey, expectedUid]);
 
   function introSteps({ game, player }) {
     
@@ -1019,6 +1061,21 @@ export default function App() {
   // CONDITIONAL RENDERING (no early returns to preserve hook order)
   // ============================================================================
 
+  // [DIAG] Which top-level branch renders this pass. `main` means EmpiricaContext
+  // mounts (intro/lobby/game decided internally by Empirica from player state).
+  console.log("[DIAG][render]", {
+    branch: showInvalidURL ? "invalidURL"
+      : (auth.status === "pending" || auth.status === "loggedOut") ? `auth:${auth.status}`
+      : auth.status === "error" ? "auth:error"
+      : (auth.status === "ok" && auth.mismatch) ? "auth:mismatch"
+      : showGroupNameEntry ? "groupNameEntry"
+      : "main",
+    ns: playerKey,
+    groupName,
+    scenario: scenarioId,
+    authStatus: auth.status,
+  });
+
   // Invalid URL - no participantKey
   if (showInvalidURL) {
     return (
@@ -1027,6 +1084,43 @@ export default function App() {
           <h1 className="text-3xl font-bold text-red-600 mb-4">Invalid URL</h1>
           <p className="text-gray-700 mb-2">
             We're sorry, you have reached this page via an invalid URL. Please contact the study administrator for more information.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Club login/identity gate (runs once a valid participantKey is present)
+  if (auth.status === "pending" || auth.status === "loggedOut") {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center p-8 bg-white rounded-lg shadow-lg max-w-md">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            {auth.status === "loggedOut" ? "Redirecting to sign in…" : "Loading…"}
+          </h1>
+          <p className="text-gray-700">Please wait.</p>
+        </div>
+      </div>
+    );
+  }
+  if (auth.status === "error") {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center p-8 bg-white rounded-lg shadow-lg max-w-md">
+          <h1 className="text-2xl font-bold text-red-600 mb-2">Something went wrong</h1>
+          <p className="text-gray-700">We couldn't verify your account. Please refresh to try again.</p>
+        </div>
+      </div>
+    );
+  }
+  if (auth.status === "ok" && auth.mismatch) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center p-8 bg-white rounded-lg shadow-lg max-w-md">
+          <h1 className="text-2xl font-bold text-red-600 mb-2">This link isn't for your account</h1>
+          <p className="text-gray-700">
+            You're signed in, but this workshop link belongs to a different account.
+            Please open the workshop from your own club account.
           </p>
         </div>
       </div>
@@ -1045,11 +1139,14 @@ export default function App() {
         <div className="relative">
           <EmpiricaMenu position="bottom-left" />
           <div>
-            <EmpiricaContext playerCreate={AutoPlayerIdForm} finished={Finished}
-             lobby={CustomLobby}
-            introSteps={introSteps} exitSteps={exitSteps} consent={ConsentUrlRouter} disableConsent={true}>
-              <Game />
-            </EmpiricaContext>
+            <EmpiricaDiagnostic />
+            <ErrorBoundary label="empirica-context">
+              <EmpiricaContext playerCreate={AutoPlayerIdForm} finished={Finished}
+               lobby={CustomLobby}
+              introSteps={introSteps} exitSteps={exitSteps} consent={ConsentUrlRouter}>
+                <Game />
+              </EmpiricaContext>
+            </ErrorBoundary>
           </div>
         </div>
       </DailyCallContext.Provider>
