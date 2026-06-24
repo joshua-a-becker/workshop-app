@@ -108,14 +108,18 @@ function Avatar({ player, empty = false, size = "w-9 h-9 text-xs" }) {
   );
 }
 
-// Selectable avatar+name token for a single player.
-function PlayerChip({ player, selected, onClick }) {
+// Selectable avatar+name token for a single player. Draggable, so the admin can
+// either click-select-then-click-a-room, or just drag the chip onto a room.
+function PlayerChip({ player, selected, onClick, onDragStart, onDragEnd }) {
   return (
     <button
       type="button"
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       onClick={onClick}
       className={
-        "flex items-center gap-2 w-full text-left rounded-lg border px-2 py-1.5 transition-colors " +
+        "flex items-center gap-2 w-full text-left rounded-lg border px-2 py-1.5 transition-colors cursor-grab active:cursor-grabbing " +
         (selected
           ? "border-blue-500 ring-2 ring-blue-400 bg-blue-50"
           : "border-gray-200 bg-white hover:bg-gray-50")
@@ -456,17 +460,21 @@ function CustomLobbyInner() {
   );
 }
 
-// Compact selectable token for a player sitting inside a room.
-function RoomMemberToken({ player, selected, onSelect }) {
+// Compact selectable token for a player sitting inside a room. Draggable too, so
+// a placed player can be dragged into another room (or back to Unassigned).
+function RoomMemberToken({ player, selected, onSelect, onDragStart, onDragEnd }) {
   return (
     <button
       type="button"
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       onClick={(e) => {
         e.stopPropagation();
         onSelect();
       }}
       className={
-        "flex items-center gap-1.5 rounded-full pl-0.5 pr-2.5 py-0.5 border transition-colors " +
+        "flex items-center gap-1.5 rounded-full pl-0.5 pr-2.5 py-0.5 border transition-colors cursor-grab active:cursor-grabbing " +
         (selected
           ? "border-blue-500 ring-2 ring-blue-400 bg-blue-50"
           : "border-gray-200 bg-white hover:bg-gray-100")
@@ -517,6 +525,50 @@ function AssignmentModal({ players, playerCount, onCancel, onConfirm }) {
     });
   }, [players, roomCount]);
 
+  // --- Drag-and-drop (additive; click+click still works everywhere) ---
+  // `dragId` is the player being dragged; `dragOverKey` is the target currently
+  // hovered (a room key or "unassigned"), used purely for highlight.
+  const [dragId, setDragId] = useState(null);
+  const [dragOverKey, setDragOverKey] = useState(null);
+
+  const handleDragStart = (id) => (e) => {
+    setDragId(id);
+    setSelectedId(null);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", id);
+  };
+  const handleDragEnd = () => {
+    setDragId(null);
+    setDragOverKey(null);
+  };
+  // roomKey === null means "drop back into the unassigned pool".
+  const dropTo = (roomKey) => (e) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData("text/plain") || dragId;
+    setDragId(null);
+    setDragOverKey(null);
+    if (!id) return;
+    if (roomKey === null) {
+      setAssignments((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    } else {
+      setAssignments((prev) => ({ ...prev, [id]: roomKey }));
+    }
+  };
+  const allowDrop = (key) => (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverKey !== key) setDragOverKey(key);
+  };
+  const handleDragLeave = (key) => (e) => {
+    // Ignore leave events fired when moving onto a child element.
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    setDragOverKey((k) => (k === key ? null : k));
+  };
+
   const place = (roomKey) => {
     if (!selectedId) return;
     setAssignments((prev) => ({ ...prev, [selectedId]: roomKey }));
@@ -551,9 +603,42 @@ function AssignmentModal({ players, playerCount, onCancel, onConfirm }) {
       ? "Put at least one game room together to start."
       : null;
 
+  // Soft warnings — allowed, but worth a confirmation before starting. These are
+  // distinct from the hard blocks above (solo rooms / no games at all).
+  const smallGames = startableGames.filter((g) => g.length < playerCount).length;
+  const bigGames = startableGames.filter((g) => g.length > playerCount).length;
+  const warnings = [];
+  if (unassigned.length > 0) {
+    warnings.push(
+      `${unassigned.length} player${unassigned.length === 1 ? "" : "s"} will be left unassigned and stay in the lobby.`
+    );
+  }
+  if (smallGames > 0) {
+    warnings.push(
+      `${smallGames} game${smallGames === 1 ? "" : "s"} ${smallGames === 1 ? "has" : "have"} fewer than the recommended ${playerCount} players.`
+    );
+  }
+  if (bigGames > 0) {
+    warnings.push(
+      `${bigGames} game${bigGames === 1 ? "" : "s"} ${bigGames === 1 ? "has" : "have"} more than the recommended ${playerCount} players.`
+    );
+  }
+
+  // When set, the warning confirmation dialog is shown before the actual start.
+  const [showWarnings, setShowWarnings] = useState(false);
+
+  const doConfirm = () => {
+    setShowWarnings(false);
+    onConfirm(gameRooms.filter((g) => g.length >= 2).map((g) => g.map((p) => p.id)));
+  };
+
   const handleConfirm = () => {
     if (!canConfirm) return;
-    onConfirm(gameRooms.filter((g) => g.length >= 2).map((g) => g.map((p) => p.id)));
+    if (warnings.length > 0) {
+      setShowWarnings(true);
+      return;
+    }
+    doConfirm();
   };
 
   const applyResult = (result) => {
@@ -615,8 +700,12 @@ function AssignmentModal({ players, playerCount, onCancel, onConfirm }) {
           {/* Unassigned pool */}
           <div
             onClick={unassignSelected}
+            onDragOver={allowDrop("unassigned")}
+            onDragLeave={handleDragLeave("unassigned")}
+            onDrop={dropTo(null)}
             className={
-              "w-64 flex-shrink-0 border-r border-gray-200 p-4 overflow-y-auto " +
+              "w-64 flex-shrink-0 border-r border-gray-200 p-4 overflow-y-auto transition-colors " +
+              (dragOverKey === "unassigned" ? "bg-blue-50 " : "") +
               (selectedId ? "cursor-pointer hover:bg-blue-50/40" : "")
             }
           >
@@ -637,6 +726,8 @@ function AssignmentModal({ players, playerCount, onCancel, onConfirm }) {
                     player={p}
                     selected={selectedId === p.id}
                     onClick={() => toggleSelect(p.id)}
+                    onDragStart={handleDragStart(p.id)}
+                    onDragEnd={handleDragEnd}
                   />
                 </div>
               ))}
@@ -657,9 +748,14 @@ function AssignmentModal({ players, playerCount, onCancel, onConfirm }) {
                   <div
                     key={idx}
                     onClick={() => place(`g${idx}`)}
+                    onDragOver={allowDrop(`g${idx}`)}
+                    onDragLeave={handleDragLeave(`g${idx}`)}
+                    onDrop={dropTo(`g${idx}`)}
                     className={
                       "border rounded-lg p-3 bg-white transition-colors min-h-[5.5rem] " +
-                      (selectedId
+                      (dragOverKey === `g${idx}`
+                        ? "border-blue-500 bg-blue-50/60 "
+                        : selectedId
                         ? "cursor-pointer border-blue-300 hover:border-blue-500 hover:bg-blue-50/40 "
                         : "border-gray-200 ") +
                       (underfilled ? "ring-1 ring-amber-300" : "")
@@ -686,6 +782,8 @@ function AssignmentModal({ players, playerCount, onCancel, onConfirm }) {
                           player={p}
                           selected={selectedId === p.id}
                           onSelect={() => toggleSelect(p.id)}
+                          onDragStart={handleDragStart(p.id)}
+                          onDragEnd={handleDragEnd}
                         />
                       ))}
                       {Array.from({ length: emptySlots }, (_, i) => (
@@ -728,6 +826,55 @@ function AssignmentModal({ players, playerCount, onCancel, onConfirm }) {
           onDoubleUp={() => applyResult(chunkOverfill(pendingShuffle, playerCount))}
         />
       )}
+
+      {showWarnings && (
+        <StartWarningDialog
+          warnings={warnings}
+          onCancel={() => setShowWarnings(false)}
+          onConfirm={doConfirm}
+        />
+      )}
+    </div>
+  );
+}
+
+// Shown when the admin starts with non-blocking issues (unassigned players, or
+// games smaller/larger than recommended). Lists each issue and lets them go
+// back and fix it, or start anyway.
+function StartWarningDialog({ warnings, onCancel, onConfirm }) {
+  return (
+    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
+        <div className="flex items-start gap-3 mb-4">
+          <AlertTriangle className="w-8 h-8 text-amber-500 flex-shrink-0" strokeWidth={2} />
+          <h3 className="text-lg font-semibold text-gray-900 mt-0.5">
+            Start with these issues?
+          </h3>
+        </div>
+        <ul className="space-y-2 mb-6">
+          {warnings.map((w, i) => (
+            <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+              <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+              <span>{w}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+          >
+            Go back
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-lg bg-amber-500 text-white font-semibold hover:bg-amber-600 transition-colors flex items-center gap-2"
+          >
+            <Play className="w-4 h-4" />
+            Start anyway
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
