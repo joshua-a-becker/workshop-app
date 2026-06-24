@@ -8,28 +8,76 @@
       "RP": 0,
       "scoresheet": {
         "Pet_Allowance": [
-          { "option": "Include", "score": 4, "reason": "You really want to keep your dog" },
-          { "option": "Exclude", "score": 0, "reason": "No pets allowed" }
+          {
+            "option": "Include",
+            "score": 4,
+            "reason": "You really want to keep your dog"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": "No pets allowed"
+          }
         ],
         "Reserved_Parking": [
-          { "option": "Include", "score": 3, "reason": "A guaranteed spot saves you daily hassle" },
-          { "option": "Exclude", "score": 0, "reason": "Park on the street" }
+          {
+            "option": "Include",
+            "score": 3,
+            "reason": "A guaranteed spot saves you daily hassle"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": "Park on the street"
+          }
         ],
         "Gym_Access": [
-          { "option": "Include", "score": 2, "reason": "Saves you a separate gym membership" },
-          { "option": "Exclude", "score": 0, "reason": "No building gym access" }
+          {
+            "option": "Include",
+            "score": 2,
+            "reason": "Saves you a separate gym membership"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": "No building gym access"
+          }
         ],
         "Fresh_Repaint": [
-          { "option": "Include", "score": 1, "reason": "A freshly painted unit is nicer to move into" },
-          { "option": "Exclude", "score": 0, "reason": "Move in as-is" }
+          {
+            "option": "Include",
+            "score": 1,
+            "reason": "A freshly painted unit is nicer to move into"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": "Move in as-is"
+          }
         ],
         "Early_Move_In": [
-          { "option": "Include", "score": 2, "reason": "You can leave your current place sooner" },
-          { "option": "Exclude", "score": 0, "reason": "Move in on the standard date" }
+          {
+            "option": "Include",
+            "score": 2,
+            "reason": "You can leave your current place sooner"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": "Move in on the standard date"
+          }
         ],
         "Two_Year_Term": [
-          { "option": "Include", "score": -2, "reason": "Locks you in and reduces your flexibility" },
-          { "option": "Exclude", "score": 0, "reason": "A standard one-year term" }
+          {
+            "option": "Include",
+            "score": -2,
+            "reason": "Locks you in and reduces your flexibility"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": "A standard one-year term"
+          }
         ]
       }
     },
@@ -40,57 +88,98 @@
       "RP": 0,
       "scoresheet": {
         "Pet_Allowance": [
-          { "option": "Include", "score": -1, "reason": "A small risk of wear and noise complaints" },
-          { "option": "Exclude", "score": 0, "reason": "No pets, no risk" }
+          {
+            "option": "Include",
+            "score": -1,
+            "reason": "A small risk of wear and noise complaints"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": "No pets, no risk"
+          }
         ],
         "Reserved_Parking": [
-          { "option": "Include", "score": 2, "reason": "You can bundle in a parking fee" },
-          { "option": "Exclude", "score": 0, "reason": "Keep the spot free for visitors" }
+          {
+            "option": "Include",
+            "score": 2,
+            "reason": "You can bundle in a parking fee"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": "Keep the spot free for visitors"
+          }
         ],
         "Gym_Access": [
-          { "option": "Include", "score": 1, "reason": "The gym already exists — costs you nothing to grant" },
-          { "option": "Exclude", "score": 0, "reason": "Withhold building amenities" }
+          {
+            "option": "Include",
+            "score": 1,
+            "reason": "The gym already exists — costs you nothing to grant"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": "Withhold building amenities"
+          }
         ],
         "Fresh_Repaint": [
-          { "option": "Include", "score": -4, "reason": "Repainting is expensive and time-consuming" },
-          { "option": "Exclude", "score": 0, "reason": "No painting cost" }
+          {
+            "option": "Include",
+            "score": -4,
+            "reason": "Repainting is expensive and time-consuming"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": "No painting cost"
+          }
         ],
         "Early_Move_In": [
-          { "option": "Include", "score": -3, "reason": "You lose your cleaning and prep window" },
-          { "option": "Exclude", "score": 0, "reason": "Keep your full turnaround time" }
+          {
+            "option": "Include",
+            "score": -3,
+            "reason": "You lose your cleaning and prep window"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": "Keep your full turnaround time"
+          }
         ],
         "Two_Year_Term": [
-          { "option": "Include", "score": 3, "reason": "Less turnover and guaranteed occupancy" },
-          { "option": "Exclude", "score": 0, "reason": "A standard one-year term" }
+          {
+            "option": "Include",
+            "score": 3,
+            "reason": "Less turnover and guaranteed occupancy"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": "A standard one-year term"
+          }
         ]
       }
     }
   ],
   "tips": "<p class=\"text-gray-700 mb-4\">This is a <strong>features</strong> negotiation: for each term you jointly decide to <strong>include</strong> it or <strong>exclude</strong> it. Each term is worth a different amount to each side, which opens the door to <strong>integrative</strong> (\"win-win\") deals.</p><p>Look for <strong>logrolling</strong> opportunities — concede on a term that costs you little to gain one you value highly. A term that one party loves and the other barely minds should usually be <em>included</em>; a term that costs one party a lot and helps the other only a little should usually be <em>excluded</em>. Don't treat every term as a fight.</p><p>Always keep your <strong>BATNA</strong> in mind: never accept a total package worth less than 0 to you. Aim for the set of include/exclude choices that grows the total value for both sides.</p>",
   "debrief": {
-    "video_title": "Debrief: Creating Value Through Logrolling",
-    "video_url": "https://customer-dxcdx06s3qk3zhto.cloudflarestream.com/726cfe7355a9dfefe0ae887131a88f6b/manifest/video.m3u8",
-    "outcome_note": "Compare your score with the others in your group — and remember that a higher combined total means you left less value on the table.",
-    "discussion_questions": [
+    "tabs": [
       {
-        "question": "Which terms did you end up including, and which did you exclude?",
-        "guidance": "Walk through the final package together and check whether each choice actually reflected who valued that term most."
+        "name": "Outcome",
+        "html": "<h3>Negotiation Outcome</h3>\n{{#agreement}}\n<p>🎉 <strong>Congratulations — your group reached an agreement!</strong></p>\n<p>Your score is <strong>{{score}} points</strong>.</p>\n{{/agreement}}\n{{#noAgreement}}\n<p><strong>No Agreement Reached.</strong> Your group did not reach an agreement, so each of you falls back to your BATNA.</p>\n{{/noAgreement}}\n<p>Compare your score with the others in your group — and remember that a higher combined total means you left less value on the table.</p>"
       },
       {
-        "question": "Did you trade a low-value term for a high-value one (logrolling)?",
-        "guidance": "Identify at least one term you conceded cheaply to win one you cared about — or one you wish you had."
+        "name": "Discussion Questions",
+        "html": "<h3>Discussion Questions</h3>\n<p>Talk through these prompts together as a group before watching the debrief video.</p>\n<ol>\n  <li><strong>Which terms did you end up including, and which did you exclude?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Walk through the final package together and check whether each choice actually reflected who valued that term most.</span></li>\n  <li><strong>Did you trade a low-value term for a high-value one (logrolling)?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Identify at least one term you conceded cheaply to win one you cared about — or one you wish you had.</span></li>\n  <li><strong>How early did you share your priorities, and did it help or hurt you?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Discuss the tension between revealing what you want and protecting your position.</span></li>\n  <li><strong>Did either side accept a package close to their BATNA?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Talk about whether anyone risked taking a deal worth less than walking away.</span></li>\n  <li><strong>If you ran this again, what one thing would you do differently?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Be specific — a behavior, not just \"negotiate better.\"</span></li>\n</ol>"
       },
       {
-        "question": "How early did you share your priorities, and did it help or hurt you?",
-        "guidance": "Discuss the tension between revealing what you want and protecting your position."
+        "name": "Debrief Video",
+        "html": "<h3>Debrief: Creating Value Through Logrolling</h3>\n<div style=\"position:relative;padding-top:56.25%;background:#000;border-radius:0.5rem;overflow:hidden\">\n  <iframe src=\"https://customer-dxcdx06s3qk3zhto.cloudflarestream.com/726cfe7355a9dfefe0ae887131a88f6b/iframe\" style=\"position:absolute;inset:0;width:100%;height:100%;border:0\" allow=\"accelerometer;gyroscope;encrypted-media;picture-in-picture\" allowfullscreen></iframe>\n</div>"
       },
       {
-        "question": "Did either side accept a package close to their BATNA?",
-        "guidance": "Talk about whether anyone risked taking a deal worth less than walking away."
-      },
-      {
-        "question": "If you ran this again, what one thing would you do differently?",
-        "guidance": "Be specific — a behavior, not just \"negotiate better.\""
+        "name": "Your Notes",
+        "type": "notes"
       }
     ]
   }

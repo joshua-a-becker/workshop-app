@@ -5,7 +5,7 @@ import {
 } from "@empirica/core/player/classic/react";
 import { Loading } from "@empirica/core/player/react";
 import React from "react";
-import { markExerciseComplete } from "./clubApi";
+import { markExerciseComplete, saveExerciseOutcome } from "./clubApi";
 import { ReadRole } from "./components/ReadRole";
 import { ReadyToNegotiate } from "./components/ReadyToNegotiate";
 import { VideoNegotiate } from "./components/VideoNegotiate";
@@ -65,6 +65,28 @@ export function Stage({ profileComponent }) {
   }
 
   if (stageName === "Debrief & Discussion") {
+    // The negotiation is over and the outcome (agreement, vote count, points) was
+    // stashed on the player at the end of "Time To Negotiate" (see callbacks.js).
+    // Forward it to the signed-in member's club profile. Fire-and-forget so the
+    // debrief renders immediately; the cookie is sent so the club resolves the
+    // UID. Gate on a SUCCESSFUL response so it persists once and a failure retries
+    // on the next render (the club endpoint upserts, so any duplicate before the
+    // flag lands is harmless).
+    if (!player.get("outcomeDb")) {
+      const params = new URLSearchParams(window.location.search);
+      const scenario = player.get("scenario") || params.get("scenario");
+      const outcome = {
+        reachedAgreement: player.get("reachedAgreement") ?? false,
+        voteCount: player.get("voteCount") ?? 0,
+        pointsEarned: player.get("bonus") ?? 0,
+        jointPayoff: player.get("jointPayoff") ?? 0,
+      };
+      if (scenario) {
+        saveExerciseOutcome(scenario, outcome)
+          .then((res) => { if (res && res.ok) player.set("outcomeDb", true); })
+          .catch(() => {}); // best-effort; never block the debrief
+      }
+    }
     return <VideoDebrief profileComponent={profileComponent} />;
   }
 

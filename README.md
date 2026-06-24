@@ -66,7 +66,7 @@ Plus `roles_v1.json` / `roles_v2.json` — the original three-party vacation-pla
 4. **Read Role** (5 min) - Review private role narrative, scoresheet, and BATNA
 5. **Transition** (15 sec) - Countdown before negotiation begins
 6. **Negotiate** (30 min) - Live video negotiation with proposal submission and voting
-7. **Debrief & Discussion** - Same split-screen layout (video call on the right), with a tabbed panel on the left: the **Outcome** (score), a set of **Discussion Questions** to talk through as a group, and a **Debrief Video**. Content is driven by the `debrief` block in the role data.
+7. **Debrief & Discussion** - Same split-screen layout (video call on the right), with a **data-driven tabbed panel** on the left. The tabs (names, order, and HTML content) come entirely from the `debrief.tabs` array in the role data; each tab auto-generates a "Continue to *<next tab>*" button. A reserved `notes` tab type renders the standardized autosaving "Your Notes" component.
 8. **Outcome (exit)** - Final score display based on agreement or BATNA
 
 ### Outcome Rules
@@ -383,13 +383,14 @@ Shown during the **"Debrief & Discussion"** stage (a separate round that runs af
 
 The live video call continues so the group can talk through the debrief together.
 
-#### `DebriefPanel.jsx` — Tabbed Debrief Interface
+#### `DebriefPanel.jsx` — Data-Driven Tabbed Debrief Interface
 
-Three self-paced tabs, each ending in a large button that advances to the next:
+The panel is fully driven by the `debrief.tabs` array in the role data — there are no hard-coded tabs. Each tab is `{ name, type?, html? }`:
 
-1. **Outcome** — Shows whether the group reached agreement and the player's final score (read from `player.bonus` / `player.reachedAgreement`, set in `onRoundEnded`). Button: "Proceed to Discussion Questions".
-2. **Discussion Questions** — Numbered list of prompts (with optional guidance) for the group to talk through, from `debrief.discussion_questions` in the role data. Button: "Proceed to Debrief Video".
-3. **Debrief Video** — Plays the debrief video from `debrief.video_url`. Cloudflare Stream HLS manifest URLs are converted to the minimal Stream iframe player (just a play button + standard controls, no logos) via `toEmbedUrl()`; any other URL is embedded as-is.
+- **`html` tabs** (the default `type`) render `html` verbatim via `dangerouslySetInnerHTML` (same `prose` styling as the negotiation Tips tab), after lightweight template substitution: simple vars `{{score}}` (the player's `bonus`, 2 d.p.), `{{roleName}}`, `{{displayName}}`, and conditional blocks `{{#agreement}}…{{/agreement}}` / `{{#noAgreement}}…{{/noAgreement}}` (driven by `player.reachedAgreement`, set in `onRoundEnded`). This lets the per-player Outcome, the discussion prompts, and the debrief video (just an `<iframe>` in HTML) all be authored from JSON.
+- **`notes` tab** (`type: "notes"`) renders the standardized **Your Notes** component: an autosaving textarea persisted to `player.exerciseNote` and the club API (`saveExerciseNote`). This is the one tab that can't be static HTML.
+
+Every tab except the last auto-generates a large "Continue to *<next tab's name>*" button. If no valid `debrief.tabs` are configured, the panel falls back to a single **Your Notes** tab.
 
 #### `MaterialsPanel.jsx` — Tabbed Negotiation Interface (~790 lines)
 
@@ -884,17 +885,25 @@ Single-issue price bargaining. Each role carries a `multiplier` (buyer `+1`, sel
 
 ### Debrief Block
 
-A top-level `debrief` object (shared across all roles, like `tips`) supplies the content for the **Debrief & Discussion** stage. All fields are optional — an absent `debrief` simply shows placeholder messages.
+A top-level `debrief` object (shared across all roles, like `tips`) supplies the content for the **Debrief & Discussion** stage. It is **fully data-driven**: a single `tabs` array defines the tab names, order, and content. If `debrief.tabs` is absent or empty, the stage falls back to a single **Your Notes** tab.
 
 ```json
 {
   "debrief": {
-    "video_title": "Debrief: Creating Value Through Logrolling",
-    "video_url": "https://customer-xxxx.cloudflarestream.com/<id>/manifest/video.m3u8",
-    "outcome_note": "Optional line shown under the score on the Outcome tab.",
-    "discussion_questions": [
-      { "question": "Which terms did you include vs. exclude?", "guidance": "Optional supporting hint shown under the question." },
-      "A plain string also works as a question with no guidance."
+    "tabs": [
+      {
+        "name": "Outcome",
+        "html": "<h3>Negotiation Outcome</h3>\n{{#agreement}}\n<p>🎉 Your group reached an agreement! Your score is <strong>{{score}} points</strong>.</p>\n{{/agreement}}\n{{#noAgreement}}\n<p>No agreement — each of you falls back to your BATNA.</p>\n{{/noAgreement}}"
+      },
+      {
+        "name": "Discussion Questions",
+        "html": "<h3>Discussion Questions</h3>\n<ol>\n  <li><strong>Which terms did you include vs. exclude?</strong></li>\n</ol>"
+      },
+      {
+        "name": "Debrief Video",
+        "html": "<h3>Debrief Video</h3>\n<div style=\"position:relative;padding-top:56.25%;background:#000;border-radius:0.5rem;overflow:hidden\">\n  <iframe src=\"https://customer-xxxx.cloudflarestream.com/<id>/iframe\" style=\"position:absolute;inset:0;width:100%;height:100%;border:0\" allow=\"encrypted-media;picture-in-picture\" allowfullscreen></iframe>\n</div>"
+      },
+      { "name": "Your Notes", "type": "notes" }
     ]
   }
 }
@@ -902,10 +911,21 @@ A top-level `debrief` object (shared across all roles, like `tips`) supplies the
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `video_title` | String | Heading shown above the debrief video (defaults to "Debrief Video"). |
-| `video_url` | String | Debrief video URL. A Cloudflare Stream **HLS manifest** URL (`.../<id>/manifest/video.m3u8`) is auto-converted to the minimal Stream **iframe** player; any other embeddable URL is used as-is. |
-| `outcome_note` | String | Optional extra text on the Outcome tab. |
-| `discussion_questions` | Array | List of prompts. Each item is either a string, or an object `{ question, guidance }`. |
+| `tabs` | Array | Ordered list of tab objects. Each `{ name, type?, html? }`. |
+| `tabs[].name` | String | Tab label. Also drives the auto-generated "Continue to *<this name>*" button on the previous tab. |
+| `tabs[].type` | String | `"html"` (default) or `"notes"`. |
+| `tabs[].html` | String | For `html` tabs: HTML rendered verbatim (with `prose` styling) after template substitution. |
+
+**Template placeholders** (substituted in every `html` tab before rendering):
+
+| Placeholder | Expands to |
+|-------------|-----------|
+| `{{score}}` | The player's `bonus`, formatted to 2 decimals. |
+| `{{roleName}}` / `{{displayName}}` | The player's role / display name. |
+| `{{#agreement}}…{{/agreement}}` | Block kept only when the player reached agreement. |
+| `{{#noAgreement}}…{{/noAgreement}}` | Block kept only when no agreement was reached. |
+
+The **video** is just an `<iframe>` inside an `html` tab — there is no special video field or auto-embed conversion; for a Cloudflare Stream clip use the `/<id>/iframe` player URL (not the `.m3u8` manifest) and wrap it in the responsive 16:9 `<div>` shown above. The **`notes`** tab type renders the standardized autosaving "Your Notes" component and takes no `html`.
 
 ### Designing a Scenario
 

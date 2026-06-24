@@ -56,3 +56,16 @@ export function saveExerciseNote(scenario, note) {
     body: JSON.stringify({ scenario, note }),
   });
 }
+
+// Save the structured outcome of an exercise (arbitrary JSON — agreement, vote
+// count, points, …) to the signed-in member's profile. Same cookie-authenticated
+// pattern as saveExerciseNote: the club resolves the real UID server-side from
+// the session cookie. Returns the fetch promise so the caller can gate on success.
+export function saveExerciseOutcome(scenario, outcome) {
+  return fetch(`${CLUB_BASE}/api/exercise-outcome`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenario, outcome }),
+  });
+}

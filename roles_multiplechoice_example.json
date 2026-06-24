@@ -8,24 +8,72 @@
       "RP": 0,
       "scoresheet": {
         "Salary": [
-          { "option": "$90,000", "score": 0, "reason": "Below market for your skills" },
-          { "option": "$110,000", "score": 4, "reason": "A solid, fair salary" },
-          { "option": "$130,000", "score": 8, "reason": "Excellent — well above your target" }
+          {
+            "option": "$90,000",
+            "score": 0,
+            "reason": "Below market for your skills"
+          },
+          {
+            "option": "$110,000",
+            "score": 4,
+            "reason": "A solid, fair salary"
+          },
+          {
+            "option": "$130,000",
+            "score": 8,
+            "reason": "Excellent — well above your target"
+          }
         ],
         "Start_Date": [
-          { "option": "Immediately", "score": 0, "reason": "No time to rest between jobs" },
-          { "option": "In 1 month", "score": 1, "reason": "A short, workable break" },
-          { "option": "In 3 months", "score": 2, "reason": "A proper break before starting" }
+          {
+            "option": "Immediately",
+            "score": 0,
+            "reason": "No time to rest between jobs"
+          },
+          {
+            "option": "In 1 month",
+            "score": 1,
+            "reason": "A short, workable break"
+          },
+          {
+            "option": "In 3 months",
+            "score": 2,
+            "reason": "A proper break before starting"
+          }
         ],
         "Annual_Leave": [
-          { "option": "2 weeks", "score": 0, "reason": "Less time off than you'd like" },
-          { "option": "3 weeks", "score": 2, "reason": "A comfortable amount of leave" },
-          { "option": "4 weeks", "score": 4, "reason": "Generous time off — a big plus" }
+          {
+            "option": "2 weeks",
+            "score": 0,
+            "reason": "Less time off than you'd like"
+          },
+          {
+            "option": "3 weeks",
+            "score": 2,
+            "reason": "A comfortable amount of leave"
+          },
+          {
+            "option": "4 weeks",
+            "score": 4,
+            "reason": "Generous time off — a big plus"
+          }
         ],
         "Remote_Days": [
-          { "option": "0 days / week", "score": 0, "reason": "Fully in-office, a long commute" },
-          { "option": "2 days / week", "score": 2, "reason": "A healthy hybrid balance" },
-          { "option": "4 days / week", "score": 4, "reason": "Mostly remote — ideal for you" }
+          {
+            "option": "0 days / week",
+            "score": 0,
+            "reason": "Fully in-office, a long commute"
+          },
+          {
+            "option": "2 days / week",
+            "score": 2,
+            "reason": "A healthy hybrid balance"
+          },
+          {
+            "option": "4 days / week",
+            "score": 4,
+            "reason": "Mostly remote — ideal for you"
+          }
         ]
       }
     },
@@ -36,53 +84,94 @@
       "RP": 0,
       "scoresheet": {
         "Salary": [
-          { "option": "$90,000", "score": 8, "reason": "Keeps costs well within budget" },
-          { "option": "$110,000", "score": 4, "reason": "An acceptable cost" },
-          { "option": "$130,000", "score": 0, "reason": "Stretches the budget to its limit" }
+          {
+            "option": "$90,000",
+            "score": 8,
+            "reason": "Keeps costs well within budget"
+          },
+          {
+            "option": "$110,000",
+            "score": 4,
+            "reason": "An acceptable cost"
+          },
+          {
+            "option": "$130,000",
+            "score": 0,
+            "reason": "Stretches the budget to its limit"
+          }
         ],
         "Start_Date": [
-          { "option": "Immediately", "score": 3, "reason": "The team needs help right away" },
-          { "option": "In 1 month", "score": 1, "reason": "A manageable wait" },
-          { "option": "In 3 months", "score": 0, "reason": "Leaves the role unfilled too long" }
+          {
+            "option": "Immediately",
+            "score": 3,
+            "reason": "The team needs help right away"
+          },
+          {
+            "option": "In 1 month",
+            "score": 1,
+            "reason": "A manageable wait"
+          },
+          {
+            "option": "In 3 months",
+            "score": 0,
+            "reason": "Leaves the role unfilled too long"
+          }
         ],
         "Annual_Leave": [
-          { "option": "2 weeks", "score": 3, "reason": "Maximizes working days" },
-          { "option": "3 weeks", "score": 1, "reason": "Standard, acceptable leave" },
-          { "option": "4 weeks", "score": 0, "reason": "More time away from the desk" }
+          {
+            "option": "2 weeks",
+            "score": 3,
+            "reason": "Maximizes working days"
+          },
+          {
+            "option": "3 weeks",
+            "score": 1,
+            "reason": "Standard, acceptable leave"
+          },
+          {
+            "option": "4 weeks",
+            "score": 0,
+            "reason": "More time away from the desk"
+          }
         ],
         "Remote_Days": [
-          { "option": "0 days / week", "score": 4, "reason": "Full in-office presence preferred" },
-          { "option": "2 days / week", "score": 2, "reason": "A workable hybrid arrangement" },
-          { "option": "4 days / week", "score": 0, "reason": "Little in-person collaboration" }
+          {
+            "option": "0 days / week",
+            "score": 4,
+            "reason": "Full in-office presence preferred"
+          },
+          {
+            "option": "2 days / week",
+            "score": 2,
+            "reason": "A workable hybrid arrangement"
+          },
+          {
+            "option": "4 days / week",
+            "score": 0,
+            "reason": "Little in-person collaboration"
+          }
         ]
       }
     }
   ],
   "tips": "<p class=\"text-gray-700 mb-4\">This is a <strong>multi-issue</strong> negotiation, which opens the door to <strong>integrative</strong> (\"win-win\") deals. The key insight: the issues are worth different amounts to each side.</p><p>Look for <strong>logrolling</strong> opportunities — trade away an issue you care little about in exchange for one you value highly. If start date matters more to one party and salary more to the other, each can concede on the cheap issue to gain on the expensive one, leaving both better off than a simple compromise on every issue.</p><p>Always keep your <strong>BATNA</strong> in mind: never accept a total package worth less than 0 to you. And don't just split every issue down the middle — find the trades that grow the total value for everyone.</p>",
   "debrief": {
-    "video_title": "Debrief: Trading Across Issues",
-    "video_url": "https://customer-dxcdx06s3qk3zhto.cloudflarestream.com/726cfe7355a9dfefe0ae887131a88f6b/manifest/video.m3u8",
-    "outcome_note": "Compare scores across your group — the best deals here come from packaging issues together, not settling each one in isolation.",
-    "discussion_questions": [
+    "tabs": [
       {
-        "question": "On which issue did each side give the most ground?",
-        "guidance": "Map each issue to who cared about it most and check whether your final choices matched."
+        "name": "Outcome",
+        "html": "<h3>Negotiation Outcome</h3>\n{{#agreement}}\n<p>🎉 <strong>Congratulations — your group reached an agreement!</strong></p>\n<p>Your score is <strong>{{score}} points</strong>.</p>\n{{/agreement}}\n{{#noAgreement}}\n<p><strong>No Agreement Reached.</strong> Your group did not reach an agreement, so each of you falls back to your BATNA.</p>\n{{/noAgreement}}\n<p>Compare scores across your group — the best deals here come from packaging issues together, not settling each one in isolation.</p>"
       },
       {
-        "question": "Did you negotiate issues one at a time or as a package?",
-        "guidance": "Discuss how bundling issues changed (or could have changed) the result."
+        "name": "Discussion Questions",
+        "html": "<h3>Discussion Questions</h3>\n<p>Talk through these prompts together as a group before watching the debrief video.</p>\n<ol>\n  <li><strong>On which issue did each side give the most ground?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Map each issue to who cared about it most and check whether your final choices matched.</span></li>\n  <li><strong>Did you negotiate issues one at a time or as a package?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Discuss how bundling issues changed (or could have changed) the result.</span></li>\n  <li><strong>Where did your priorities differ most from the other party's?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Those gaps are exactly where integrative trades create value.</span></li>\n  <li><strong>Did anyone anchor first, and what effect did it have?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Talk about how the opening offer shaped the rest of the conversation.</span></li>\n  <li><strong>What would have made this a better deal for both sides?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Look for a trade you both missed that would have raised the combined total.</span></li>\n</ol>"
       },
       {
-        "question": "Where did your priorities differ most from the other party's?",
-        "guidance": "Those gaps are exactly where integrative trades create value."
+        "name": "Debrief Video",
+        "html": "<h3>Debrief: Trading Across Issues</h3>\n<div style=\"position:relative;padding-top:56.25%;background:#000;border-radius:0.5rem;overflow:hidden\">\n  <iframe src=\"https://customer-dxcdx06s3qk3zhto.cloudflarestream.com/726cfe7355a9dfefe0ae887131a88f6b/iframe\" style=\"position:absolute;inset:0;width:100%;height:100%;border:0\" allow=\"accelerometer;gyroscope;encrypted-media;picture-in-picture\" allowfullscreen></iframe>\n</div>"
       },
       {
-        "question": "Did anyone anchor first, and what effect did it have?",
-        "guidance": "Talk about how the opening offer shaped the rest of the conversation."
-      },
-      {
-        "question": "What would have made this a better deal for both sides?",
-        "guidance": "Look for a trade you both missed that would have raised the combined total."
+        "name": "Your Notes",
+        "type": "notes"
       }
     ]
   }

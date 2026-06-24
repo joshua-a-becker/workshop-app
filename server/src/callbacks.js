@@ -723,16 +723,54 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
   // Per-scenario game size from the matching treatment.
   const playerCount = scenarioPlayerCount(ctx, batch, startScenario);
 
-  // Mode chosen by the admin in the lobby modal. Default to "overfill"
-  // (Inclusive — nobody waits) if the payload is missing or unexpected.
-  const mode = requestStart.mode === "exact" ? "exact" : "overfill";
-  console.log(`[PLAYER] Distributing with playerCount=${playerCount}, mode=${mode}`);
+  // The admin assigns players to rooms by hand in the lobby modal and sends the
+  // result as `assignments`: an array (one entry per game room) of playerId
+  // arrays. Anyone not listed — explicitly parked in the "Stay in Lobby" room or
+  // otherwise omitted — stays in the lobby as a leftover. We fall back to the
+  // legacy `mode` chunking only if a client sends no explicit assignments.
+  const explicitAssignments = Array.isArray(requestStart.assignments)
+    ? requestStart.assignments
+    : null;
 
-  const { games: chunks, leftovers } = chunkByMode(sameScenario, playerCount, mode);
+  let chunks;
+  let leftovers;
+
+  if (explicitAssignments) {
+    const byId = new Map(sameScenario.map(p => [p.id, p]));
+    const usedIds = new Set();
+    chunks = [];
+    for (const group of explicitAssignments) {
+      if (!Array.isArray(group)) continue;
+      const groupPlayers = [];
+      for (const id of group) {
+        const p = byId.get(id);
+        if (p && !usedIds.has(id)) {
+          groupPlayers.push(p);
+          usedIds.add(id);
+        }
+      }
+      // A game needs at least 2 real players. A room that resolves to fewer
+      // (e.g. a player left, or wrong scenario) is dropped; those players fall
+      // through to leftovers below rather than starting a degenerate game.
+      if (groupPlayers.length >= 2) {
+        chunks.push(groupPlayers);
+      } else {
+        for (const p of groupPlayers) usedIds.delete(p.id);
+      }
+    }
+    leftovers = sameScenario.filter(p => !usedIds.has(p.id));
+    console.log(`[PLAYER] Distributing with playerCount=${playerCount}, explicit assignments`);
+  } else {
+    // Legacy fallback: chunk by mode. Default to "overfill" (nobody waits).
+    const mode = requestStart.mode === "exact" ? "exact" : "overfill";
+    console.log(`[PLAYER] Distributing with playerCount=${playerCount}, mode=${mode}`);
+    ({ games: chunks, leftovers } = chunkByMode(sameScenario, playerCount, mode));
+  }
+
   console.log(`[DIAG][requestStart] chunked`, {
     startScenario,
     playerCount,
-    mode,
+    explicit: !!explicitAssignments,
     playersToAssign: playersToAssign.map(p => p.id),
     sameScenario: sameScenario.map(p => p.id),
     chunkSizes: chunks.map(c => c.length),
@@ -1174,13 +1212,16 @@ Empirica.on("player", "introDone", async (ctx, { player }) => {
 // GAME EVENTS - Existing game start logic
 // ============================================================================
 
-Empirica.onRoundEnded(({ round }) => {
-  // Only the negotiation round produces a score. Later rounds (e.g. the Debrief
-  // round) also fire this callback, and must NOT overwrite the computed bonus.
-  if (round.get("name") !== "Negotiation Game") {
+Empirica.onStageEnded(({ stage }) => {
+  // Score at the end of the live negotiation stage — the last stage of the
+  // Negotiation Game round — so the outcome (bonus + agreement) is on each
+  // player before the Debrief round/stage renders. Every other stage end is a
+  // no-op here and must NOT touch the computed bonus.
+  if (stage.get("name") !== "Time To Negotiate") {
     return;
   }
 
+  const round = stage.round;
   const game = round.currentGame;
   const history = round.get("proposalHistory") || [];
   const finalProposal = history.length > 0 ? history[history.length - 1] : null;
@@ -1193,7 +1234,7 @@ Empirica.onRoundEnded(({ round }) => {
                       Object.values(finalVotes).every(vote => vote === "finalize");
   const reachedAgreement = finalProposal && allFinalized;
 
-  console.log("onRoundEnded - Agreement check:", {
+  console.log("negotiate stage end - Agreement check:", {
     historyLength: history.length,
     finalVoteCount,
     playerCount,
@@ -1202,6 +1243,10 @@ Empirica.onRoundEnded(({ round }) => {
   });
 
   const negotiationType = game.get("negotiationType") || "features";
+
+  // Joint payoff = sum of every player's individual bonus; accumulated as we go
+  // and stashed on each player below so the Debrief stage can forward it too.
+  let jointPayoff = 0;
 
   // Calculate and save bonus (the negotiated "value") for each player
   game.players.forEach((player) => {
@@ -1239,8 +1284,16 @@ Empirica.onRoundEnded(({ round }) => {
     // Persist the agreement flag per-player so the post-negotiation Debrief stage
     // can show the correct outcome without re-deriving it from the bonus.
     player.set("reachedAgreement", reachedAgreement);
+    // Stash the final-vote count too, so the Debrief stage can forward the full
+    // outcome (agreement + votes + points) to the club profile (see Stage.jsx).
+    player.set("voteCount", finalVoteCount);
+    jointPayoff += bonus;
     console.log(`Player ${player.id} bonus: ${bonus} (agreement: ${reachedAgreement})`);
   });
+
+  // Stash the joint payoff (sum of individual bonuses) on each player now that
+  // every bonus is known, so the Debrief stage can forward it to the club.
+  game.players.forEach((player) => player.set("jointPayoff", jointPayoff));
 
   // Save whether agreement was reached to the round
   round.set("agreementReached", reachedAgreement);
@@ -1276,8 +1329,8 @@ Empirica.onGameStart(({ game }) => {
   // Store tips in game state for client access
   game.set("tips", rolesData.tips || "");
 
-  // Store post-negotiation debrief content (discussion questions + debrief video)
-  // for the client. Shared across all roles, like tips.
+  // Store the post-negotiation debrief content for the client (the data-driven
+  // `tabs` array). Stored verbatim and shared across all roles, like tips.
   game.set("debrief", rolesData.debrief || {});
 
   // Price negotiations carry a scenario-level display config (label, prefix, …).
@@ -1445,8 +1498,9 @@ Empirica.onGameStart(({ game }) => {
   });
 
   // ROUND 2 -- Post-negotiation debrief. A separate round so the negotiation
-  // round can end first (computing each player's bonus in onRoundEnded) before
-  // the Debrief stage shows the outcome, discussion questions, and debrief video.
+  // round ends first — each player's bonus is computed when the "Time To
+  // Negotiate" stage ends (onStageEnded) — before the Debrief stage renders its
+  // data-driven tabs (which can show the outcome).
   const debriefRound = game.addRound({
     name: "Debrief",
   });
