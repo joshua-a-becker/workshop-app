@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "../components/Button";
 
-export function Introduction({ next }) {
+export function Introduction({ next, previous, index }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
       <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full p-8 md:p-12">
@@ -20,15 +20,19 @@ export function Introduction({ next }) {
             </p>
             <br/>
             <p className="text-base leading-relaxed">
-            You will have <span className="font-semibold">5 minutes to read and prepare</span>. After 5 minutes, you will be automatically placed into a <span className="font-semibold">video chat</span> with your negotiation group.
-          </p>
-          <br/>
-            <p className="text-base leading-relaxed">
-              You will have <span className="font-semibold">20 minutes</span> to try to reach a satisfactory agreement. Your goal is to get as many points as possible.  
+              You will first have time to read your role materials and prepare to negotiate. 
             </p>
-            {/* <br/><p className="text-base leading-relaxed">
-              Points determine your bonus on Prolific. 1 point = $1 dollar.
-            </p> */}
+            <br/>
+            <p className="text-base leading-relaxed">          
+              After (some mechanism TBD, currently 5 mins) you will be automatically placed into a <span className="font-semibold">video chat</span> with your negotiation group.
+            </p>
+            <br/>
+            <p className="text-base leading-relaxed">
+              You will have as much time as you like to try to reach a satisfactory agreement. Your goal is to get as many points as possible.  
+            </p>
+            <p><br/>
+              You can end the negotiation ("walk away from the table) and proceed to the debrief using the "quit" option provided.
+            </p>
           </div>
 
           <div className="bg-amber-50 border-l-4 border-amber-500 p-5 rounded-r-lg">
@@ -46,7 +50,12 @@ export function Introduction({ next }) {
           </p>
         </div>
 
-        <div className="mt-8 flex justify-center">
+        <div className="mt-8 flex justify-center items-center gap-4">
+          {index > 0 && (
+            <Button handleClick={previous} primary>
+              <span className="text-lg px-4">Back</span>
+            </Button>
+          )}
           <Button handleClick={next} autoFocus>
             <span className="text-lg px-4">Continue to Consent Form</span>
           </Button>

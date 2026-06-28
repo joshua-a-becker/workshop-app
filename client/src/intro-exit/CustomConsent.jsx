@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "../components/Button.jsx";
 
-export default function CustomConsent({ next }) {
+export default function CustomConsent({ next, previous, index }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 p-6">
       <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full p-10 md:p-14 border border-gray-200">
@@ -20,10 +20,13 @@ export default function CustomConsent({ next }) {
           {/* Introduction */}
           <div className="bg-blue-50 border border-blue-200 rounded-md p-5">
             <p className="text-base">
-              By participating in this activity, you are agreeing to the use of your data for research on negotiation and decision making.
+              By participating in this activity, you are agreeing to the collection of your data for research on negotiation and decision making.
             </p>
             <p className="text-base mt-3">
               We will be recording the video and chat data in this activity. You can disable your video and sound at any point during the activity.
+            </p>
+            <p className="text-base mt-3">
+              To opt-out of your data being used for research, just email joshua.becker@ucl.ac.uk and proceed to the activity.  This choice will not impact your access to the online course.
             </p>
           </div>
 
@@ -33,17 +36,7 @@ export default function CustomConsent({ next }) {
               Purpose of the Research
             </h2>
             <p className="text-base ml-5">
-              We are trying to understand how people seek agreement in classroom negotiation exercises. This research seeks to improve negotiation education and identify methods for improving outcomes by practicing negotiators.
-            </p>
-          </section>
-
-          {/* Procedures */}
-          <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-3 font-serif border-l-4 border-indigo-600 pl-4">
-              Procedures
-            </h2>
-            <p className="text-base ml-5">
-              You will be provided with a role narrative and a scoresheet. You will be placed into a video chat with two other participants. Your goal in the activity is to maximize the number of points obtained for your role by reaching the best possible agreement, or earning the points of your no-agreement alternative.
+              We are trying to understand how people negotiate in classroom exercises to improve negotiation education and practice.
             </p>
           </section>
 
@@ -53,7 +46,7 @@ export default function CustomConsent({ next }) {
               Safety Statement
             </h2>
             <p className="text-base ml-5">
-              This session poses the same discomforts you may expect to encounter in a typical classroom setting. You will be negotiating live with other participants and we cannot control your experience. Negotiation exercises can be challenging, and you may encounter rude or argumentative behavior.
+              This session is like a typical online classroom. You will be negotiating live with other participants and we cannot control your experience. Negotiation exercises can be challenging, and you may encounter rude or argumentative behavior.
             </p>
           </section>
 
@@ -63,17 +56,19 @@ export default function CustomConsent({ next }) {
               Benefits
             </h2>
             <p className="text-base ml-5">
-              By participating, you will receive practice negotiating comparable to university classroom exercises.  After the task is completed, we will provide you a link to free resources to improve your negotiation skills.
+              By participating, you will receive practice negotiating similar to university classroom exercises.  These exercises support learning points found in the lecture videos.
             </p>
           </section>
 
           {/* Anonymity */}
           <section>
             <h2 className="text-xl font-bold text-gray-900 mb-3 font-serif border-l-4 border-indigo-600 pl-4">
-              Anonymity
+              Privacy
             </h2>
             <p className="text-base ml-5">
               All data will be anonymized prior to analysis. No identifying information will shared outside this research team. All personal data will be stored securely within a UCL research data environment.
+
+              To request data deletion email joshua.becker@ucl.ac.uk from your registered email.
             </p>
           </section>
         </div>
@@ -88,7 +83,12 @@ export default function CustomConsent({ next }) {
         </div>
 
         {/* Button */}
-        <div className="mt-8 flex justify-center">
+        <div className="mt-8 flex justify-center items-center gap-4">
+          {index > 0 && (
+            <Button handleClick={previous} primary>
+              <span className="text-lg px-8 py-1">Back</span>
+            </Button>
+          )}
           <Button handleClick={next} autoFocus>
             <span className="text-lg px-8 py-1">I Consent</span>
           </Button>

@@ -228,7 +228,7 @@ export function MediaPermissionGate({ children, onPermissionsGranted, storedVide
           <div className="bg-white p-8 rounded-lg shadow-xl max-w-md">
             <h2 className="text-xl font-bold mb-4">Camera and Microphone Access Required</h2>
             <p className="mb-4">
-              This study requires access to your camera and microphone for video collaboration with your team.
+              This activity requires access to your camera and microphone for video collaboration with your team.
             </p>
             <p className="mb-4">
               When you click "Continue", your browser will ask for permission to access your camera and microphone.

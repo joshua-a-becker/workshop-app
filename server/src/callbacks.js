@@ -633,21 +633,15 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
 
   console.log(`[PLAYER] Found waiting game ${game.id}`);
 
-  // Verify requester is admin
+  // The admin machinery still runs (we read/track groupAdmins below), but the
+  // start request is no longer gated on it — any group member may start the game.
   const groupAdmins = game.get("groupAdmins") || {};
-  console.log(`[DIAG][requestStart] admin check`, {
+  console.log(`[DIAG][requestStart] start requested`, {
     groupName,
     adminForGroup: groupAdmins[groupName],
     requestingPlayerId,
-    isAdmin: groupAdmins[groupName] === requestingPlayerId,
     rosterIds: Object.keys(game.get("waitingPlayers") || {}),
   });
-  if (groupAdmins[groupName] !== requestingPlayerId) {
-    console.log(`[PLAYER] Player ${requestingPlayerId} is not admin of group "${groupName}", ignoring`);
-    player.set("requestStart", null);
-    Empirica.flush();
-    return;
-  }
 
   // Get players in this group
   const waitingPlayers = game.get("waitingPlayers") || {};
@@ -1109,11 +1103,14 @@ Empirica.on("player", async (ctx, { player }) => {
 // game at creation time, not here — so no (re)assignment is needed.
 Empirica.on("player", "scenario", async (ctx, { player }) => {
   console.log(`[PLAYER] Player ${player.id} set scenario to: ${player.get("scenario")}`);
-  const gameId = player.get("gameID");
-  if (!gameId) return;
-  const game = Array.from(ctx.scopesByKind("game").values()).find(g => g.id === gameId);
-  const batch = game && Array.from(ctx.scopesByKind("batch").values())
-    .find(b => b.id === game.get("batchID"));
+  // Validate against the running batch directly. Do NOT gate on gameID: with a fast
+  // connection (e.g. ?devKey=oandi bypasses the club auth round-trip) the client can
+  // set `scenario` before assignToWaitingGame has assigned a gameID. Gating here would
+  // silently skip validation, and since `scenario` only changes once this listener
+  // never re-fires — leaving the "No scenario" error stamped at connect (callbacks
+  // line ~1059) permanently uncleared. Resolve the batch the same way assignment does.
+  const batch = Array.from(ctx.scopesByKind("batch").values())
+    .find(b => b.get("status") === "running");
   if (batch) {
     validateScenario(ctx, batch, player);
     Empirica.flush();

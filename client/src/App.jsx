@@ -150,15 +150,32 @@ export default function App() {
     window.history.replaceState({}, "", newUrl);
   }
 
-  if (!playerKey && devKey === "oandi") {
-    // Generate 15 digit random alphanumeric string
+  if (devKey === "oandi") {
+    // Dev passthrough: auto-fill the identity bits a real workshop URL would
+    // carry, so a bare ?devKey=oandi link loads straight into the app. We add
+    // participantKey, uid, and displayName — but intentionally NOT groupName or
+    // scenario, so those can be supplied (or their absence tested) by hand.
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    playerKey = Array.from({ length: 15 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    const rand = (n) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    const animals = ["lion", "tiger", "bear", "elephant", "giraffe", "zebra", "monkey", "panda", "kangaroo", "wolf"];
 
-    // Add the generated participantKey to the URL
-    urlParams.set("participantKey", playerKey);
-    const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
-    window.history.replaceState({}, "", newUrl);
+    let urlChanged = false;
+    if (!playerKey) {
+      playerKey = rand(15);
+      urlParams.set("participantKey", playerKey);
+      urlChanged = true;
+    }
+    if (!urlParams.get("uid")) {
+      urlParams.set("uid", rand(15));
+      urlChanged = true;
+    }
+    if (!urlParams.get("displayName")) {
+      urlParams.set("displayName", animals[Math.floor(Math.random() * animals.length)]);
+      urlChanged = true;
+    }
+    if (urlChanged) {
+      window.history.replaceState({}, "", `${window.location.pathname}?${urlParams.toString()}`);
+    }
   }
 
   // ============================================================================
@@ -178,7 +195,10 @@ export default function App() {
   };
 
   // Flags for conditional rendering (no early returns!)
-  const showInvalidURL = !playerKey || !scenarioId || !uidFromUrl;
+  // Read uid fresh from urlParams: the dev passthrough may have just injected it
+  // (after the uidFromUrl capture above). scenario is always required — devKey
+  // users are expected to add ?scenario= to the URL manually.
+  const showInvalidURL = !playerKey || !scenarioId || !urlParams.get("uid");
   const showGroupNameEntry = playerKey && !groupName;
 
   // Verify the participant is logged into the club AND that the URL's
@@ -222,23 +242,27 @@ export default function App() {
     const introSteps = []
 
     if (skipIntro == "T") {
+      // Skip the intro slides, consent screen, and the name-entry form — but NOT
+      // media setup. We still route through DisplayNameEntry so MediaPermissionGate
+      // runs and the mediaStream is established before the lobby. Without a stream
+      // the player never joins the Daily call, so other participants never see
+      // their video even though they're counted in the lobby roster.
       const randomAnimal = ["lion","tiger","bear","elephant","giraffe","zebra","monkey","panda","kangaroo","wolf"][Math.floor(Math.random()*10)];
 
-      const displayName = player.get("displayName") ?? randomAnimal;
+      // Ensure a valid displayName is in the URL so DisplayNameEntry auto-submits
+      // the instant permission is granted — the name form is never shown.
+      if (!urlParams.get("displayName")) {
+        urlParams.set("displayName", player.get("displayName") || randomAnimal);
+        window.history.replaceState({}, "", `${window.location.pathname}?${urlParams.toString()}`);
+      }
 
-      player.set("displayName", displayName);
-
-      // CRITICAL: Mark intro as done so player appears in assignment
+      // Mark intro complete so the lobby enables video once we arrive there.
+      // (DisplayNameEntry sets displayName from the URL on auto-submit.)
       player.set("introDone", true);
-
-      // Set groupName from URL for group assignment
-      const groupNameFromUrl = urlParams.get("groupName") || "default";
-      player.set("groupName", groupNameFromUrl);
-
-      // Set scenario from URL for batch routing (empty if absent → lobby shows error)
+      player.set("groupName", urlParams.get("groupName") || "default");
       player.set("scenario", urlParams.get("scenario") || "");
 
-      return []
+      return [DisplayNameEntry];
     }
 
     introSteps.push(Introduction)

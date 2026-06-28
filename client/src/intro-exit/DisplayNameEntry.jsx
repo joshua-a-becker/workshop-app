@@ -5,7 +5,7 @@ import { DailyCallContext } from "../App.jsx";
 
 import { usePlayer } from "@empirica/core/player/classic/react";
 
-export function DisplayNameEntry({ next }) {
+export function DisplayNameEntry({ next, previous, index }) {
   const { setMediaStream } = useContext(DailyCallContext);
 
   const player = usePlayer();
@@ -140,7 +140,12 @@ export function DisplayNameEntry({ next }) {
             )}
           </div>
 
-          <div className="text-center pt-4">
+          <div className="flex justify-center items-center gap-4 pt-4">
+            {index > 0 && (
+              <Button handleClick={previous} primary>
+                Back
+              </Button>
+            )}
             <Button handleClick={handleSubmit}>
               Continue
             </Button>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useMemo, useRef } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
 import { Users, Video, Play, X, AlertTriangle, Shuffle } from "lucide-react";
 import { usePlayer, useGame } from "@empirica/core/player/classic/react";
 import { DailyCallContext } from "../App.jsx";
@@ -201,9 +201,11 @@ function CustomLobbyInner() {
     return members;
   }, [waitingPlayersObj, myGroupName, player?.id]);
 
-  // Calculate total group members and whether game can start
+  // Calculate total group members and whether game can start. The admin
+  // machinery still runs silently in the background, but the start gate is no
+  // longer tied to it — any group member can start once there are 2+ players.
   const totalGroupMembers = groupMembers.length + 1; // +1 for current player
-  const canStartGame = isAdmin && totalGroupMembers >= 2;
+  const canStartGame = totalGroupMembers >= 2;
 
   // Real per-game size, surfaced by the server on the waiting game so the
   // lobby can preview how the group would be split. In a multi-treatment batch
@@ -211,11 +213,6 @@ function CustomLobbyInner() {
   const myScenario = player?.get("scenario");
   const scenarioSizes = game?.get("scenarioSizes") || {};
   const gamePlayerCount = scenarioSizes[myScenario] || game?.get("gamePlayerCount") || 4;
-
-  // Find the admin's display name (if admin is someone other than the current player)
-  const adminName = adminId && !isAdmin
-    ? (groupMembers.find(p => p.id === adminId)?.displayName || "Anonymous")
-    : null;
 
   // Create a Set of player IDs for video filtering
   const groupMemberIds = useMemo(() => {
@@ -287,8 +284,8 @@ function CustomLobbyInner() {
     console.log("[DIAG][lobby] openAssignmentModal click", {
       playerId: player?.id, isAdmin, hasGame: !!game, hasPlayer: !!player,
     });
-    if (!isAdmin || !game || !player) {
-      console.warn("[DIAG][lobby] openAssignmentModal BLOCKED - not admin or no game/player");
+    if (!game || !player) {
+      console.warn("[DIAG][lobby] openAssignmentModal BLOCKED - no game/player");
       return;
     }
     setShowAssignmentModal(true);
@@ -300,8 +297,8 @@ function CustomLobbyInner() {
     console.log("[DIAG][lobby] confirmStartGame click", {
       playerId: player?.id, isAdmin, gameId: game?.id, gameID: player?.get("gameID"), assignments,
     });
-    if (!isAdmin || !game || !player) {
-      console.warn("[DIAG][lobby] confirmStartGame BLOCKED - not admin or no game/player");
+    if (!game || !player) {
+      console.warn("[DIAG][lobby] confirmStartGame BLOCKED - no game/player");
       return;
     }
 
@@ -315,52 +312,13 @@ function CustomLobbyInner() {
     setShowAssignmentModal(false);
   };
 
-  // Show a modal the first time this player transitions into admin
-  // (e.g. when the previous admin is pruned by the presence sweep).
-  const [showAdminModal, setShowAdminModal] = useState(false);
-  const prevIsAdminRef = useRef(false);
-  const adminInitializedRef = useRef(false);
-
-  useEffect(() => {
-    // Wait until we have both a resolved player and a known admin for the group.
-    if (!player?.id || !adminId) return;
-
-    if (!adminInitializedRef.current) {
-      adminInitializedRef.current = true;
-      prevIsAdminRef.current = isAdmin;
-      return;
-    }
-
-    if (prevIsAdminRef.current === false && isAdmin === true) {
-      setShowAdminModal(true);
-    }
-    prevIsAdminRef.current = isAdmin;
-  }, [isAdmin, player?.id, adminId]);
+  // The admin machinery (assignment/reassignment) still runs on the server, but
+  // it's silent here — players are never notified when they become admin, and the
+  // start button is available to everyone regardless.
 
   return (
     <div className="h-screen w-screen bg-gray-100 flex">
       <Heartbeat />
-      {showAdminModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-            <div className="flex justify-center mb-4">
-              <Users className="w-12 h-12 text-green-500" strokeWidth={1.5} />
-            </div>
-            <h2 className="text-xl font-semibold text-center text-gray-900 mb-2">
-              You are now the group admin
-            </h2>
-            <p className="text-center text-gray-600 mb-6">
-              You can start the game whenever your group is ready.
-            </p>
-            <button
-              onClick={() => setShowAdminModal(false)}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-            >
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
       {showAssignmentModal && (
         <AssignmentModal
           players={assignmentPlayers}
@@ -381,23 +339,19 @@ function CustomLobbyInner() {
           </h1>
         </div>
 
-        {/* Start button for admin */}
-        {isAdmin && (
-          <>
-            <button
-              onClick={openAssignmentModal}
-              disabled={!canStartGame}
-              className="w-full mb-6 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors"
-            >
-              <Play className="w-5 h-5" />
-              Start Game ({totalGroupMembers} player{totalGroupMembers !== 1 ? 's' : ''})
-            </button>
-            {!canStartGame && (
-              <p className="text-xs text-amber-600 mb-4 -mt-4">
-                Need at least 2 players to start
-              </p>
-            )}
-          </>
+        {/* Start button — available to every group member */}
+        <button
+          onClick={openAssignmentModal}
+          disabled={!canStartGame}
+          className="w-full mb-6 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+        >
+          <Play className="w-5 h-5" />
+          Start Game ({totalGroupMembers} player{totalGroupMembers !== 1 ? 's' : ''})
+        </button>
+        {!canStartGame && (
+          <p className="text-xs text-amber-600 mb-4 -mt-4">
+            Need at least 2 players to start
+          </p>
         )}
 
         {/* Group members list */}
@@ -408,12 +362,12 @@ function CustomLobbyInner() {
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
               <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <span>{player?.get("displayName") || "You"} (You){isAdmin && " - Admin"}</span>
+              <span>{player?.get("displayName") || "You"} (You)</span>
             </div>
             {groupMembers.map(p => (
               <div key={p.id} className="flex items-center gap-2 text-sm">
                 <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                <span>{p.displayName || "Anonymous"}{p.id === adminId && " - Admin"}</span>
+                <span>{p.displayName || "Anonymous"}</span>
               </div>
             ))}
             {groupMembers.length === 0 && (
@@ -427,11 +381,7 @@ function CustomLobbyInner() {
         {/* Waiting info */}
         <div className="text-sm text-gray-600 mb-6">
           <p className="mb-2">
-            {isAdmin
-              ? "Click 'Start Game' when everyone is ready."
-              : adminName
-                ? `Waiting for ${adminName} (group admin) to start the game.`
-                : "Waiting for the group admin to start the game."}
+            Click 'Start Game' when everyone is ready.
           </p>
         </div>
 
@@ -691,8 +641,17 @@ function AssignmentModal({ players, playerCount, onCancel, onConfirm }) {
 
         {/* Stats row */}
         <div className="flex items-center gap-6 px-6 py-3 border-b border-gray-200 bg-gray-50">
-          <span className="text-lg text-gray-900"><strong>Players per game:</strong> {playerCount}</span>
-          <span className="text-lg text-gray-900"><strong>Total players:</strong> {players.length}</span>
+          <span className="text-lg text-gray-900 flex-shrink-0"><strong>Players per game:</strong> {playerCount}</span>
+          <span className="text-lg text-gray-900 flex-shrink-0"><strong>Total players:</strong> {players.length}</span>
+          {players.length % playerCount !== 0 && (
+            <div className="flex items-center gap-2 text-amber-700 min-w-0">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-500" strokeWidth={2} />
+              <span className="text-xs leading-tight">
+                You have an odd number of players, and will need to either overfill
+                or leave someone in the lobby.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Body: unassigned pool + rooms */}
