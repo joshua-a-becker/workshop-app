@@ -1,5 +1,6 @@
 {
   "type": "price",
+  "prep_time": 5,
   "price_config": {
     "label": "Sale Price",
     "prefix": "$",

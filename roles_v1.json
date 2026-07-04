@@ -1,4 +1,5 @@
 {
+  "prep_time": 5,
   "roles": [
     {
       "role_name": "Party A",
@@ -7,36 +8,100 @@
       "RP": 0,
       "scoresheet": {
         "Budget_Hotel": [
-          { "option": "Include", "score": 1.10, "reason": "Saves a lot of money" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": 1.1,
+            "reason": "Saves a lot of money"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Hiking": [
-          { "option": "Include", "score": 1.05, "reason": "Adventurous, active experience" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": 1.05,
+            "reason": "Adventurous, active experience"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Sleep_Early_at_Night": [
-          { "option": "Include", "score": 0.77, "reason": "Saves a little money; More relaxation" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": 0.77,
+            "reason": "Saves a little money; More relaxation"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Packed_Lunches": [
-          { "option": "Include", "score": 0.48, "reason": "Saves a little money" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": 0.48,
+            "reason": "Saves a little money"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Michelin_Star_Dinner": [
-          { "option": "Include", "score": -0.75, "reason": "Quite costly" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": -0.75,
+            "reason": "Quite costly"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Multiple_Day_Activities": [
-          { "option": "Include", "score": -0.87, "reason": "Costly and feels rushed and unrelaxed" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": -0.87,
+            "reason": "Costly and feels rushed and unrelaxed"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Short_Layover": [
-          { "option": "Include", "score": -0.91, "reason": "Very stressful and risks missing flight" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": -0.91,
+            "reason": "Very stressful and risks missing flight"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Premium_Flight": [
-          { "option": "Include", "score": -0.95, "reason": "Extremely costly" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": -0.95,
+            "reason": "Extremely costly"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ]
       }
     },
@@ -47,36 +112,100 @@
       "RP": 0,
       "scoresheet": {
         "Budget_Hotel": [
-          { "option": "Include", "score": -0.47, "reason": "Reduces trip quality" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": -0.47,
+            "reason": "Reduces trip quality"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Hiking": [
-          { "option": "Include", "score": 1.15, "reason": "Adventurous, active experience" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": 1.15,
+            "reason": "Adventurous, active experience"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Sleep_Early_at_Night": [
-          { "option": "Include", "score": -0.15, "reason": "Wants to do several late night activities" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": -0.15,
+            "reason": "Wants to do several late night activities"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Packed_Lunches": [
-          { "option": "Include", "score": -1.07, "reason": "Wants to eat restaurant-quality food" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": -1.07,
+            "reason": "Wants to eat restaurant-quality food"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Michelin_Star_Dinner": [
-          { "option": "Include", "score": 0.84, "reason": "Greatly improves trip experience" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": 0.84,
+            "reason": "Greatly improves trip experience"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Multiple_Day_Activities": [
-          { "option": "Include", "score": 0.10, "reason": "Increases variety of experiences" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": 0.1,
+            "reason": "Increases variety of experiences"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Short_Layover": [
-          { "option": "Include", "score": 1.39, "reason": "Frees up more activity time in destination" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": 1.39,
+            "reason": "Frees up more activity time in destination"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Premium_Flight": [
-          { "option": "Include", "score": 0.00, "reason": "Provides added comfort but not significantly" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": 0,
+            "reason": "Provides added comfort but not significantly"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ]
       }
     },
@@ -87,36 +216,100 @@
       "RP": 0,
       "scoresheet": {
         "Budget_Hotel": [
-          { "option": "Include", "score": 0.11, "reason": "Saves money but a little far from activities" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": 0.11,
+            "reason": "Saves money but a little far from activities"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Hiking": [
-          { "option": "Include", "score": -1.60, "reason": "Opposite of city and indoor comforts" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": -1.6,
+            "reason": "Opposite of city and indoor comforts"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Sleep_Early_at_Night": [
-          { "option": "Include", "score": 0.04, "reason": "Saves a little money; reduces activities" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": 0.04,
+            "reason": "Saves a little money; reduces activities"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Packed_Lunches": [
-          { "option": "Include", "score": 0.94, "reason": "Saves a little money" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": 0.94,
+            "reason": "Saves a little money"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Michelin_Star_Dinner": [
-          { "option": "Include", "score": -1.27, "reason": "Quite costly for you" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": -1.27,
+            "reason": "Quite costly for you"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Multiple_Day_Activities": [
-          { "option": "Include", "score": 0.94, "reason": "Increases variety of experiences" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": 0.94,
+            "reason": "Increases variety of experiences"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Short_Layover": [
-          { "option": "Include", "score": 1.40, "reason": "Frees up more activity time in destination" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": 1.4,
+            "reason": "Frees up more activity time in destination"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ],
         "Premium_Flight": [
-          { "option": "Include", "score": -1.97, "reason": "Extremely costly" },
-          { "option": "Exclude", "score": 0, "reason": "" }
+          {
+            "option": "Include",
+            "score": -1.97,
+            "reason": "Extremely costly"
+          },
+          {
+            "option": "Exclude",
+            "score": 0,
+            "reason": ""
+          }
         ]
       }
     }

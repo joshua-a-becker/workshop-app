@@ -1502,8 +1502,13 @@ Empirica.onGameStart(({ game }) => {
 
   // STANDARD GAME SETUP HERE
 
-  const readRoleTime = game.get("treatment")?.readRoleTime ?? 300;
-  const negotiateTime = game.get("treatment")?.negotiateTime ?? 1800;
+  // Prep time comes from the scenario's role JSON (top-level `prep_time`, in
+  // minutes) like all other scenario data — treatments stay generic.
+  const prepMinutes = Number(rolesData.prep_time);
+  const readRoleTime = Number.isFinite(prepMinutes) && prepMinutes > 0 ? prepMinutes * 60 : 300;
+  // Negotiation time is effectively unlimited — the impasse button (forceQuit)
+  // and reaching agreement are how the stage ends, not the clock.
+  const negotiateTime = 1000000;
   const debriefTime = game.get("treatment")?.debriefTime ?? 1800;
 
 

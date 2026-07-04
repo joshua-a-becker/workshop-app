@@ -3,6 +3,11 @@ import { usePlayer, usePlayers, useGame } from "@empirica/core/player/classic/re
 import { DailyCallContext } from "../App";
 import { VolumeX, MicOff, VideoOff, Video } from "lucide-react";
 
+// Layout constants for the best-fit grid search: the grid's gap (gap-2 = 8px)
+// and the vertical space each tile spends on its name row under the video.
+const GRID_GAP = 8;
+const TILE_LABEL_H = 36;
+
 // Memoized components outside the main component to prevent recreation
 const LocalVideoComponent = React.memo(({ localVideoRef, displayName, isHidden, onToggleHide, isAudioEnabled, isVideoEnabled, onToggleAudio, onToggleVideo }) => {
 
@@ -284,6 +289,21 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null }) {
   // Track all Daily.co participants (not just those with streams)
   const [allDailyParticipants, setAllDailyParticipants] = useState({});
 
+  // Measured size of the video grid container — drives the best-fit layout.
+  // Callback ref (not useRef) because the grid div only mounts after the
+  // loading states resolve, and the observer must attach when it appears.
+  const [containerEl, setContainerEl] = useState(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    if (!containerEl) return;
+    const update = () =>
+      setContainerSize({ width: containerEl.clientWidth, height: containerEl.clientHeight });
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(containerEl);
+    return () => observer.disconnect();
+  }, [containerEl]);
+
   // Get local player info
   const localDisplayName = player?.get("displayName") || "You";
 
@@ -513,20 +533,21 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null }) {
 
   window.player=player;
 
-  // Calculate optimal grid layout
-  const calculateGridLayout = (totalParticipants) => {
-    if (totalParticipants === 0) return { cols: 1, rows: 1 };
-    if (totalParticipants === 1) return { cols: 1, rows: 1 };
-    if (totalParticipants === 2) return { cols: 2, rows: 1 };
-    if (totalParticipants <= 4) return { cols: 2, rows: 2 };
-    if (totalParticipants <= 6) return { cols: 3, rows: 2 };
-    if (totalParticipants <= 9) return { cols: 3, rows: 3 };
-    if (totalParticipants <= 12) return { cols: 4, rows: 3 };
-    if (totalParticipants <= 16) return { cols: 4, rows: 4 };
-    // For larger groups, stick with 4 columns
-    const cols = 4;
-    const rows = Math.ceil(totalParticipants / cols);
-    return { cols, rows };
+  // Pick the column count that yields the largest possible 16:9 video per tile
+  // in the measured container — a tall narrow panel stacks, a wide one goes
+  // side-by-side. Falls back to a single column before the first measurement.
+  const calculateGridLayout = (totalParticipants, width, height) => {
+    if (totalParticipants <= 1 || !width || !height) return { cols: 1 };
+    let best = { cols: 1, size: 0 };
+    for (let cols = 1; cols <= totalParticipants; cols++) {
+      const rows = Math.ceil(totalParticipants / cols);
+      const cellW = (width - GRID_GAP * (cols - 1)) / cols;
+      const cellH = (height - GRID_GAP * (rows - 1)) / rows - TILE_LABEL_H;
+      if (cellW <= 0 || cellH <= 0) continue;
+      const videoW = Math.min(cellW, cellH * (16 / 9));
+      if (videoW > best.size) best = { cols, size: videoW };
+    }
+    return best;
   };
 
   // Show loading state while room is being created, token is being generated, or media stream is being set up
@@ -565,7 +586,7 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null }) {
 
   // Calculate grid layout (local + remote participants)
   const totalParticipants = 1 + filteredParticipants.length;
-  const { cols } = calculateGridLayout(totalParticipants);
+  const { cols } = calculateGridLayout(totalParticipants, containerSize.width, containerSize.height);
 
   // Double the columns into half-columns so a partial last row can be
   // centered with a half-column offset. Each tile spans 2 half-columns.
@@ -579,6 +600,7 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null }) {
 
   return (
     <div
+      ref={setContainerEl}
       className="grid gap-2 h-full w-full overflow-hidden p-2"
       style={{
         gridTemplateColumns: `repeat(${cols * 2}, 1fr)`,

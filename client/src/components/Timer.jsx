@@ -1,8 +1,10 @@
 import { useStageTimer, useStage, useGame } from "@empirica/core/player/classic/react";
 import React from "react";
 
-// Negotiations longer than this are treated as "unlimited time": the countdown
-// is hidden during the negotiation stage so participants aren't watching a clock.
+// Stages configured longer than this are treated as "unlimited time" and the
+// countdown is hidden. The negotiation stage never shows a timer at all (the
+// Profile bar isn't rendered there — see Profile.jsx); this only applies to
+// the debrief.
 const UNLIMITED_NEGOTIATE_THRESHOLD = 5 * 60 * 60; // 5 hours, in seconds
 
 export function Timer() {
@@ -15,11 +17,7 @@ export function Timer() {
   const treatment = game?.get("treatment");
   const stageName = stage?.get("name");
   const stageTimeFactor =
-    stageName === "Time To Negotiate"
-      ? treatment?.negotiateTime
-      : stageName === "Debrief & Discussion"
-      ? treatment?.debriefTime
-      : undefined;
+    stageName === "Debrief & Discussion" ? treatment?.debriefTime : undefined;
   const hideTimer =
     typeof stageTimeFactor === "number" &&
     stageTimeFactor > UNLIMITED_NEGOTIATE_THRESHOLD;

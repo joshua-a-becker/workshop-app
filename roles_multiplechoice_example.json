@@ -1,5 +1,6 @@
 {
   "type": "multiple_choice",
+  "prep_time": 5,
   "roles": [
     {
       "role_name": "Candidate",
