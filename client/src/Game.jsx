@@ -12,6 +12,8 @@ export function Game() {
   const stage = useStage();
   const { playerCount } = game.get("treatment");
 
+  window.treatment = game.get("treatment");
+
   // [DIAG] Definitive signal that the client transitioned out of the lobby into
   // the started game. If this never logs for an authed user, the lobby→game
   // switch is the failure point.

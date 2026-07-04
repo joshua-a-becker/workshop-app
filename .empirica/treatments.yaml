@@ -32,25 +32,31 @@ factors:
         - value: https://app.negotiation.education/api/roles/features_example.json
         - value: https://app.negotiation.education/api/roles/price_example.json
         - value: https://app.negotiation.education/api/roles/multiplechoice_example.json
+        - value: https://app.negotiation.education/api/roles/ai_cs_vendor.json
+        - value: https://dev.negotiation.education/api/roles/features_example.json
+        - value: https://app.negotiation.education/api/roles/the_vacation.json
+        - value: https://dev.negotiation.education/api/roles/shared_office.json
+        - value: https://dev.negotiation.education/api/roles/ai_cs_vendor.json
+        - value: https://dev.negotiation.education/api/roles/the_vacation.json
 treatments:
-    - name: features_example
-      desc: Two-party apartment lease, include/exclude features (local file)
-      factors:
-        negotiateTime: 1800
-        playerCount: 2
-        readRoleTime: 300
-        roleDataURL: https://app.negotiation.education/api/roles/features_example.json
-    - name: price_example
-      desc: Two-party used-car sale, single price box (local file)
-      factors:
-        negotiateTime: 1800
-        playerCount: 2
-        readRoleTime: 300
-        roleDataURL: https://app.negotiation.education/api/roles/price_example.json
-    - name: multiplechoice_example
+    - name: shared_office
       desc: Two-party job offer, one dropdown per issue (local file)
       factors:
         negotiateTime: 1800
         playerCount: 2
         readRoleTime: 300
-        roleDataURL: https://app.negotiation.education/api/roles/multiplechoice_example.json
+        roleDataURL: https://dev.negotiation.education/api/roles/shared_office.json
+    - name: ai_cs_vendor
+      desc: Two-party apartment lease, include/exclude features (local file)
+      factors:
+        negotiateTime: 1800
+        playerCount: 2
+        readRoleTime: 300
+        roleDataURL: https://dev.negotiation.education/api/roles/ai_cs_vendor.json
+    - name: the_vacation
+      desc: Two-party used-car sale, single price box (local file)
+      factors:
+        negotiateTime: 1800
+        playerCount: 2
+        readRoleTime: 300
+        roleDataURL: https://dev.negotiation.education/api/roles/the_vacation.json

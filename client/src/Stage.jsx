@@ -35,8 +35,7 @@ export function Stage({ profileComponent }) {
     // Reaching this branch means the role content (the spoiler) is loaded for
     // this client, so mark the exercise complete in the club DB. Fire once per
     // player; the club's no-downgrade guard is a second safety net.
-    console.log("Here 123")
-      console.log(player.get("exerciseMarkedComplete"))
+    
     if (!player.get("exerciseMarkedComplete")) {
       const params = new URLSearchParams(window.location.search);
       // UID is passed directly as ?uid= (set on the player in AutoPlayerIdForm);
@@ -49,7 +48,7 @@ export function Stage({ profileComponent }) {
       // same key and re-freeze both fields on a rejoin within the grace window.
       const groupName = params.get("groupName") || player.get("groupName") || "";
       const displayName = params.get("displayName") || player.get("displayName") || "";
-      console.log("calling mark complete: " + uid + " / " + scenario + " / " + groupName + " / " + displayName)
+      
       markExerciseComplete(uid, scenario, groupName, displayName);
       player.set("exerciseMarkedComplete", true);
     }
