@@ -2,9 +2,10 @@ import {
   usePlayer,
   usePlayers,
   useStage,
+  useGame,
 } from "@empirica/core/player/classic/react";
 import { Loading } from "@empirica/core/player/react";
-import React from "react";
+import React, { useEffect } from "react";
 import { markExerciseComplete, saveExerciseOutcome } from "./clubApi";
 import { ReadRole } from "./components/ReadRole";
 import { ReadyToNegotiate } from "./components/ReadyToNegotiate";
@@ -15,6 +16,20 @@ export function Stage({ profileComponent }) {
   const player = usePlayer();
   const players = usePlayers();
   const stage = useStage();
+  const game = useGame();
+
+  // Force submit if an impasse was declared (game force-quit). Only during the
+  // negotiation stage — forceQuit stays true afterwards, and the Debrief stage
+  // must still be sat through normally.
+  useEffect(() => {
+    if (
+      game.get("forceQuit") === true &&
+      stage.get("name") === "Time To Negotiate" &&
+      !player.stage.get("submit")
+    ) {
+      player.stage.set("submit", true);
+    }
+  }, [game.get("forceQuit"), stage, player]);
 
   if (player.stage.get("submit")) {
     if (players.length === 1) {
