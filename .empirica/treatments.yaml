@@ -2,61 +2,13 @@ factors:
     - name: playerCount
       desc: playerCount determines the number of Players are in a Game.
       values:
-        - value: 1
         - value: 2
-        - value: 3
-        - value: 5
-        - value: 8
-        - value: 13
-    - name: negotiateTime
-      values:
-        - value: 100000
-        - value: 30000
-        - value: 1800
-        - value: 300
     - name: readRoleTime
       values:
-        - value: 100000
-        - value: 30000
         - value: 300
-    - name: roleDatURL
-      values:
-        - value: https://raw.githubusercontent.com/joshua-a-becker/zopa-vs-complexity/refs/heads/main/server/src/roles_v1.json
-    - name: roleDataURL
-      values:
-        - value: https://raw.githubusercontent.com/joshua-a-becker/zopa-vs-complexity/refs/heads/main/server/src/roles_v1.json
-        - value: https://raw.githubusercontent.com/joshua-a-becker/zopa-vs-complexity/refs/heads/main/roles_v1.json
-        - value: roles_features_example.json
-        - value: roles_multiplechoice_example.json
-        - value: roles_price_example.json
-        - value: https://app.negotiation.education/api/roles/features_example.json
-        - value: https://app.negotiation.education/api/roles/price_example.json
-        - value: https://app.negotiation.education/api/roles/multiplechoice_example.json
-        - value: https://app.negotiation.education/api/roles/ai_cs_vendor.json
-        - value: https://dev.negotiation.education/api/roles/features_example.json
-        - value: https://app.negotiation.education/api/roles/the_vacation.json
-        - value: https://dev.negotiation.education/api/roles/shared_office.json
-        - value: https://dev.negotiation.education/api/roles/ai_cs_vendor.json
-        - value: https://dev.negotiation.education/api/roles/the_vacation.json
 treatments:
-    - name: shared_office
-      desc: Two-party job offer, one dropdown per issue (local file)
+    - name: generic_all_games
+      desc: a generic treatment for all games
       factors:
-        negotiateTime: 1800
         playerCount: 2
         readRoleTime: 300
-        roleDataURL: https://dev.negotiation.education/api/roles/shared_office.json
-    - name: ai_cs_vendor
-      desc: Two-party apartment lease, include/exclude features (local file)
-      factors:
-        negotiateTime: 1800
-        playerCount: 2
-        readRoleTime: 300
-        roleDataURL: https://dev.negotiation.education/api/roles/ai_cs_vendor.json
-    - name: the_vacation
-      desc: Two-party used-car sale, single price box (local file)
-      factors:
-        negotiateTime: 1800
-        playerCount: 2
-        readRoleTime: 300
-        roleDataURL: https://dev.negotiation.education/api/roles/the_vacation.json

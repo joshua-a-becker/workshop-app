@@ -15,7 +15,6 @@ import { NegotiationOutcome } from './intro-exit/NegotiationOutcome.jsx';
 import DailyIframe from "@daily-co/daily-js";
 import { CLUB_BASE, clubUid } from "./clubApi";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { EmpiricaDiagnostic } from "./components/EmpiricaDiagnostic";
 
 // Create context for Daily.co call management (includes media stream)
 export const DailyCallContext = createContext(null);
@@ -968,10 +967,10 @@ export default function App() {
           prevData.roomUrl !== data.roomUrl ||
           prevData.meetingToken !== data.meetingToken ||
           prevData.displayName !== data.displayName) {
-        console.log("App.jsx: Call data registered/updated", data);
+        // console.log("App.jsx: Call data registered/updated", data);
         return data;
       }
-      console.log("App.jsx: Call data unchanged, skipping update");
+      // console.log("App.jsx: Call data unchanged, skipping update");
       return prevData;
     });
   }, []);
@@ -1087,18 +1086,18 @@ export default function App() {
 
   // [DIAG] Which top-level branch renders this pass. `main` means EmpiricaContext
   // mounts (intro/lobby/game decided internally by Empirica from player state).
-  console.log("[DIAG][render]", {
-    branch: showInvalidURL ? "invalidURL"
-      : (auth.status === "pending" || auth.status === "loggedOut") ? `auth:${auth.status}`
-      : auth.status === "error" ? "auth:error"
-      : (auth.status === "ok" && auth.mismatch) ? "auth:mismatch"
-      : showGroupNameEntry ? "groupNameEntry"
-      : "main",
-    ns: playerKey,
-    groupName,
-    scenario: scenarioId,
-    authStatus: auth.status,
-  });
+  // console.log("[DIAG][render]", {
+  //   branch: showInvalidURL ? "invalidURL"
+  //     : (auth.status === "pending" || auth.status === "loggedOut") ? `auth:${auth.status}`
+  //     : auth.status === "error" ? "auth:error"
+  //     : (auth.status === "ok" && auth.mismatch) ? "auth:mismatch"
+  //     : showGroupNameEntry ? "groupNameEntry"
+  //     : "main",
+  //   ns: playerKey,
+  //   groupName,
+  //   scenario: scenarioId,
+  //   authStatus: auth.status,
+  // });
 
   // Invalid URL - no participantKey
   if (showInvalidURL) {
@@ -1163,7 +1162,6 @@ export default function App() {
         <div className="relative">
           <EmpiricaMenu position="bottom-left" />
           <div>
-            <EmpiricaDiagnostic />
             <ErrorBoundary label="empirica-context">
               <EmpiricaContext playerCreate={AutoPlayerIdForm} finished={Finished}
                lobby={CustomLobby}

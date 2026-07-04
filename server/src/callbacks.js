@@ -46,7 +46,9 @@ const ROLE_DATA_BASE_DIR = process.env.ROLE_DATA_DIR || "/home/claude/workshop-a
 // it still works when launched from the project root or the server/ directory.
 function loadRoleData(source) {
   if (/^https?:\/\//i.test(source)) {
-    return JSON.parse(execSync(`curl -s "${source}"`).toString());
+    // -f: fail on HTTP errors (404 etc.) so a missing scenario throws here
+    // instead of JSON.parse-ing an error page.
+    return JSON.parse(execSync(`curl -sf "${source}"`).toString());
   }
 
   const candidates = [
@@ -70,6 +72,56 @@ function loadRoleData(source) {
   throw new Error(
     `[ROLES] Could not locate role data file from "${source}" (tried: ${candidates.join(", ")})`
   );
+}
+
+// Which club serves this deployment's role data. The env var wins; otherwise
+// sniff this machine's Caddyfile: the prod box serves platform.negotiation.education
+// (→ app club), the dev box serves platformdev.negotiation.education (→ dev club).
+// Resolved once at startup — the deployment's environment doesn't change at runtime.
+function resolveClubBase() {
+  if (process.env.CLUB_BASE) return process.env.CLUB_BASE;
+  try {
+    const caddy = fs.readFileSync("/etc/caddy/Caddyfile", "utf8");
+    if (/^\s*platform\.negotiation\.education\b/m.test(caddy)) {
+      return "https://app.negotiation.education";
+    }
+  } catch (err) {
+    console.error(`[ROLES] Could not read /etc/caddy/Caddyfile to detect environment (set CLUB_BASE to override): ${err?.message}`);
+  }
+  return "https://dev.negotiation.education";
+}
+const CLUB_BASE = resolveClubBase();
+console.log(`[ROLES] Club base for role data: ${CLUB_BASE}`);
+
+// The role JSON for a game lives in the club app's D1, exposed at
+// /api/roles/<scenario>.json. `scenario` is the bare filename from the
+// player's ?scenario= URL param.
+function roleDataUrlFor(scenario) {
+  return `${CLUB_BASE}/api/roles/${encodeURIComponent(scenario)}.json`;
+}
+
+// Fetch-and-cache scenario metadata (currently just the party count). Used to
+// validate a scenario when a player lands in the lobby and to size the lobby's
+// game-split preview. Successes are cached for the server's lifetime; failures
+// are NOT cached, so a scenario added to the club later starts working without
+// a restart.
+const scenarioInfoCache = new Map(); // roleDataURL -> { ok: true, size }
+function getScenarioInfo(scenario) {
+  const url = roleDataUrlFor(scenario);
+  const cached = scenarioInfoCache.get(url);
+  if (cached) return cached;
+  try {
+    const data = loadRoleData(url);
+    const size = Array.isArray(data.roles) ? data.roles.length : 0;
+    if (size < 2) {
+      return { ok: false, url, error: `role data has ${size} roles (need >= 2)` };
+    }
+    const info = { ok: true, url, size };
+    scenarioInfoCache.set(url, info);
+    return info;
+  } catch (err) {
+    return { ok: false, url, error: String(err?.message || err) };
+  }
 }
 
 // Helper function to create Daily.co room for waiting game
@@ -203,15 +255,11 @@ async function createWaitingGame(ctx, batch) {
   // fits the waiting game; actual games are created later with the real size.
   const cfgPlayerCount = getTargetPlayerCount(ctx, batch);
 
-  // Per-scenario sizes so the lobby preview uses the right number for each player's
-  // scenario (a multi-treatment batch can mix 2-party and 3-party games).
+  // Per-scenario sizes so the lobby preview uses the right number for each
+  // player's scenario (a lobby can mix 2-party and 3-party games). Starts empty:
+  // validateScenario fills it in as each player's scenario resolves against the
+  // club's role JSON.
   const scenarioSizes = {};
-  for (const e of (batch.get("config")?.config?.treatments || [])) {
-    const t = e.treatment;
-    const key = t?.factors?.scenario || t?.name;
-    const pc = t?.factors?.playerCount;
-    if (key && typeof pc === "number" && pc > 0) scenarioSizes[key] = pc;
-  }
 
   // batch.addGame() returns a lightweight proxy without assignPlayer/id.
   // We create it, then look up the real Game object from the context.
@@ -472,20 +520,21 @@ function findExtraPlayers(groups, needed, excludeGroup, processedPlayers) {
 async function createAndAssignGame(ctx, batch, players, groupName) {
   console.log(`[ASSIGNMENT] Creating game for group "${groupName}" with ${players.length} players`);
 
-  // Pick the treatment for this game from the players' scenario (set during intro).
-  // In a single-treatment batch this is just that treatment; in a multi-treatment
-  // batch it's the one whose `scenario` factor matches. No fallback: an unresolved
-  // scenario flags the players and aborts (we never create a wrong-treatment game).
+  // All games share the batch's single generic treatment; the scenario from the
+  // players' URL names the role JSON at this deployment's club (CLUB_BASE). No
+  // fallback: without a scenario we can't build the role URL, so we flag the
+  // players and abort (we never create a game whose roles can't be fetched).
   const scenario = players[0]?.get("scenario");
-  const treatment = getScenarioTreatment(batch, scenario);
-  if (!treatment) {
-    console.error(`[ASSIGNMENT] No treatment for scenario "${scenario}" — aborting game for group "${groupName}"`);
+  const treatment = getBatchTreatment(batch);
+  if (!scenario) {
+    console.error(`[ASSIGNMENT] Missing scenario — aborting game for group "${groupName}"`);
     for (const p of players) {
-      p.set("scenarioError", `Unknown scenario "${scenario}". Please use the link provided for your session.`);
+      p.set("scenarioError", `Could not determine the scenario for your game. Please use the link provided for your session.`);
     }
     Empirica.flush();
     return;
   }
+  const roleDataURL = roleDataUrlFor(scenario);
 
   // Snapshot existing game IDs so we can identify the newly created one
   const existingGameIds = new Set(
@@ -506,6 +555,8 @@ async function createAndAssignGame(ctx, batch, players, groupName) {
     { key: "batchID", value: batch.id },
     { key: "treatmentName", value: treatment?.name || "default" },
     { key: "groupName", value: groupName },
+    { key: "scenario", value: scenario },
+    { key: "roleDataURL", value: roleDataURL },
     { key: "isWaiting", value: false },
   ]);
 
@@ -714,7 +765,7 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
     console.log(`[PLAYER] Group mixes scenarios; starting only "${startScenario}" (${sameScenario.length}/${playersToAssign.length})`);
   }
 
-  // Per-scenario game size from the matching treatment.
+  // Per-scenario game size from the scenario's role JSON.
   const playerCount = scenarioPlayerCount(ctx, batch, startScenario);
 
   // The admin assigns players to rooms by hand in the lobby modal and sends the
@@ -899,30 +950,29 @@ function chunkByMode(players, P, mode) {
 // PLAYER EVENTS - Assign to waiting game and handle groupName
 // ============================================================================
 
-// A batch may hold several treatments (one per scenario). Resolve the treatment a
-// player's `scenario` maps to: match on the treatment's `scenario` factor (fallback
-// to its name). Matching is strict for EVERY batch — including single-treatment ones,
-// which only resolve when the param matches their `scenario`/`name`. Returns null when
-// no treatment in the batch matches, so an invalid scenario can be gated everywhere.
-function getScenarioTreatment(batch, scenario) {
-  const entries = batch.get("config")?.config?.treatments || [];
-  const match = entries.find(e => {
-    const t = e.treatment;
-    return (t?.factors?.scenario || t?.name) === scenario;
-  });
-  return match?.treatment || null;
+// Treatments no longer encode scenarios: every batch carries ONE generic
+// treatment (see .empirica/treatments.yaml) and all scenario-specific data
+// comes from the role JSON named by the player's ?scenario= URL param.
+function getBatchTreatment(batch) {
+  return batch.get("config")?.config?.treatments?.[0]?.treatment || null;
 }
 
-// Per-scenario game size, from the matching treatment. Falls back to the batch
-// default when the scenario can't be resolved (so chunking still has a number).
+// Per-scenario game size = the number of roles in the scenario's JSON. Falls
+// back to the batch default when the role data can't be resolved (so chunking
+// still has a number).
 function scenarioPlayerCount(ctx, batch, scenario) {
-  const pc = getScenarioTreatment(batch, scenario)?.factors?.playerCount;
-  return (typeof pc === "number" && pc > 0) ? pc : getTargetPlayerCount(ctx, batch);
+  if (scenario) {
+    const info = getScenarioInfo(scenario);
+    if (info.ok) return info.size;
+  }
+  return getTargetPlayerCount(ctx, batch);
 }
 
-// Validate a player's scenario against the batch's treatments and surface an error
-// for the lobby to show (no silent fallback). Enforced for EVERY batch: the scenario
-// must map to one of the batch's treatments (matched by `scenario` factor, or name).
+// Validate a player's scenario by checking its role JSON exists at the club
+// (CLUB_BASE — resolved server-side for this deployment), and surface an error
+// for the lobby to show (no silent fallback). Also records the scenario's party
+// count on the player's waiting game so the lobby preview splits with the
+// right size.
 function validateScenario(ctx, batch, player) {
   const clear = () => { if (player.get("scenarioError")) player.set("scenarioError", null); };
   const scenario = player.get("scenario");
@@ -930,11 +980,22 @@ function validateScenario(ctx, batch, player) {
     player.set("scenarioError", "No scenario was specified in your link. Please use the link provided for your session.");
     return;
   }
-  if (!getScenarioTreatment(batch, scenario)) {
+  const info = getScenarioInfo(scenario);
+  if (!info.ok) {
+    console.error(`[SCENARIO] Could not resolve "${scenario}" at ${info.url}: ${info.error}`);
     player.set("scenarioError", `Unknown scenario "${scenario}". Please use the link provided for your session.`);
     return;
   }
   clear();
+
+  const gameId = player.get("gameID");
+  const game = gameId && Array.from(ctx.scopesByKind("game").values()).find(g => g.id === gameId);
+  if (game && game.get("isWaiting")) {
+    const sizes = game.get("scenarioSizes") || {};
+    if (sizes[scenario] !== info.size) {
+      game.set("scenarioSizes", { ...sizes, [scenario]: info.size });
+    }
+  }
 }
 
 // Assign a player to the batch's shared waiting room on connect. This does NOT
@@ -1300,22 +1361,34 @@ Empirica.onStageEnded(({ stage }) => {
 Empirica.onGameStart(({ game }) => {
 
   const treatment = game.get("treatment");
-  const roleDataURL = treatment?.roleDataURL;
+  // Set at game creation from the players' ?scenario= and this deployment's CLUB_BASE.
+  const roleDataURL = game.get("roleDataURL");
   console.log(`[GAME START] Game ${game.id} treatment:`, JSON.stringify(treatment));
   console.log(`[DIAG][gameStart]`, {
     gameId: game.id,
     groupName: game.get("groupName"),
     isWaiting: game.get("isWaiting"),
     players: (game.players || []).map(p => p.id),
+    scenario: game.get("scenario"),
     roleDataURL,
   });
 
   if (!roleDataURL) {
-    console.error(`[GAME START] Game ${game.id} has no roleDataURL in treatment — cannot fetch roles`);
+    console.error(`[GAME START] Game ${game.id} has no roleDataURL — cannot fetch roles`);
+    (game.players || []).forEach(p => p.set("scenarioError", "Could not determine the scenario for your game. Please use the link provided for your session."));
+    Empirica.flush();
     return;
   }
 
-  const rolesData = loadRoleData(roleDataURL);
+  let rolesData;
+  try {
+    rolesData = loadRoleData(roleDataURL);
+  } catch (err) {
+    console.error(`[GAME START] Game ${game.id} failed to load role data from ${roleDataURL}:`, err);
+    (game.players || []).forEach(p => p.set("scenarioError", `Could not load scenario "${game.get("scenario")}". Please use the link provided for your session.`));
+    Empirica.flush();
+    return;
+  }
   const roles = rolesData.roles;
 
   // Negotiation type drives how the client interprets the role data and how

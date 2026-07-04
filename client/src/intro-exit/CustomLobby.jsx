@@ -136,8 +136,9 @@ function PlayerChip({ player, selected, onClick, onDragStart, onDragEnd }) {
 
 // Shown when a player has no scenario in their link, or the server flagged the
 // scenario as invalid. Rendered instead of the lobby — these players are never
-// assigned to a game, so they never reach the exit steps.
-function ScenarioErrorPanel({ message }) {
+// assigned to a game, so they never reach the exit steps. Also reused by Game
+// for role-data failures that surface after the lobby, at game start.
+export function ScenarioErrorPanel({ message }) {
   return (
     <div className="h-screen w-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
@@ -158,8 +159,8 @@ function ScenarioErrorPanel({ message }) {
 // usePlayer), so the Rules of Hooks are respected across renders.
 export function CustomLobby() {
   const player = usePlayer();
-  // The server validates the scenario against the batch's treatments and sets
-  // `scenarioError` when it's missing/unknown (only for multi-treatment batches).
+  // The server validates the scenario by fetching its role JSON from the club
+  // and sets `scenarioError` when it's missing/unknown.
   const scenarioError = player?.get("scenarioError");
 
   if (scenarioError) {
@@ -647,8 +648,18 @@ function AssignmentModal({ players, playerCount, onCancel, onConfirm }) {
             <div className="flex items-center gap-2 text-amber-700 min-w-0">
               <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-500" strokeWidth={2} />
               <span className="text-xs leading-tight">
-                You have an odd number of players, and will need to either overfill
-                or leave someone in the lobby.
+                {players.length < playerCount ? (
+                  <>
+                    You will need to find {playerCount - players.length} more player{playerCount - players.length === 1 ? "" : "s"},
+                    or complete the exercise with an incomplete role set. We strongly
+                    recommend you complete the exercise with all roles filled.
+                  </>
+                ) : (
+                  <>
+                    You have an odd number of players, and will need to either overfill
+                    or leave someone in the lobby.
+                  </>
+                )}
               </span>
             </div>
           )}
@@ -778,13 +789,21 @@ function AssignmentModal({ players, playerCount, onCancel, onConfirm }) {
         </div>
       </div>
 
-      {pendingShuffle && (
+      {pendingShuffle && (players.length < playerCount ? (
+        // Underfill: too few players for even one full game, so there are no
+        // options to pick between — just warn, then put everyone in one room.
+        <UnderfillWarningDialog
+          missing={playerCount - players.length}
+          onCancel={() => setPendingShuffle(null)}
+          onConfirm={() => applyResult(chunkOverfill(pendingShuffle, playerCount))}
+        />
+      ) : (
         <RandomOptionsDialog
           onCancel={() => setPendingShuffle(null)}
           onExact={() => applyResult(chunkExact(pendingShuffle, playerCount))}
           onDoubleUp={() => applyResult(chunkOverfill(pendingShuffle, playerCount))}
         />
-      )}
+      ))}
 
       {showWarnings && (
         <StartWarningDialog
@@ -831,6 +850,43 @@ function StartWarningDialog({ warnings, onCancel, onConfirm }) {
           >
             <Play className="w-4 h-4" />
             Start anyway
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Shown by Random Assign when there aren't enough players for even one full
+// game. No options to choose from — just a warning, then everyone goes into a
+// single (incomplete) room.
+function UnderfillWarningDialog({ missing, onCancel, onConfirm }) {
+  return (
+    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
+        <div className="flex items-start gap-3 mb-4">
+          <AlertTriangle className="w-8 h-8 text-amber-500 flex-shrink-0" strokeWidth={2} />
+          <h3 className="text-lg font-semibold text-gray-900 mt-0.5">
+            Not enough players for a full game
+          </h3>
+        </div>
+        <p className="text-sm text-gray-700 mb-6">
+          You will need to find {missing} more player{missing === 1 ? "" : "s"},
+          or complete the exercise with an incomplete role set. We strongly
+          recommend you complete the exercise with all roles filled.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+          >
+            Go back
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-lg bg-amber-500 text-white font-semibold hover:bg-amber-600 transition-colors"
+          >
+            Assign anyway
           </button>
         </div>
       </div>
