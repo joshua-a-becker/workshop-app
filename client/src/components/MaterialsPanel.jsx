@@ -732,7 +732,7 @@ export function MaterialsPanel({
                 onClick={() => setShowQuitModal(false)}
                 className="w-full px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-semibold"
               >
-                Return to Game
+                Return to Negotiation
               </button>
               <button
                 onClick={() => {
@@ -741,7 +741,7 @@ export function MaterialsPanel({
                 }}
                 className="w-full px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold"
               >
-                End Game for Everyone
+                End Negotiation for Everyone
               </button>
             </div>
           </div>
@@ -758,7 +758,7 @@ export function MaterialsPanel({
                 Are you sure?
               </h3>
               <p className="text-lg text-gray-700">
-                Ending the game now will end it for everybody.
+                Ending the negotiation now will end it for everybody.
               </p>
             </div>
             <div className="flex flex-col gap-3">
@@ -766,7 +766,7 @@ export function MaterialsPanel({
                 onClick={() => setShowQuitConfirmModal(false)}
                 className="w-full px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-semibold"
               >
-                Return to Game
+                Return to Negotiation
               </button>
               <button
                 onClick={() => {
@@ -779,7 +779,7 @@ export function MaterialsPanel({
                 }}
                 className="w-full px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold"
               >
-                End Game for Everyone
+                End Negotiation for Everyone
               </button>
             </div>
           </div>
@@ -794,7 +794,7 @@ export function MaterialsPanel({
               <div className="text-6xl mb-4">⏳</div>
               {quitRequest.by === player.id ? (
                 <h3 className="text-2xl font-bold text-red-600 mb-3">
-                  The game will end in {quitSecondsLeft} second{quitSecondsLeft !== 1 ? 's' : ''}
+                  The negotiation will end in {quitSecondsLeft} second{quitSecondsLeft !== 1 ? 's' : ''}
                 </h3>
               ) : (
                 <>
@@ -802,7 +802,7 @@ export function MaterialsPanel({
                     {quitRequest.byName} has declared an impasse
                   </h3>
                   <p className="text-lg text-gray-700">
-                    The game will end in {quitSecondsLeft} second{quitSecondsLeft !== 1 ? 's' : ''} unless {quitRequest.byName} cancels.
+                    The negotiation will end in {quitSecondsLeft} second{quitSecondsLeft !== 1 ? 's' : ''} unless {quitRequest.byName} cancels.
                   </p>
                 </>
               )}
@@ -817,7 +817,7 @@ export function MaterialsPanel({
                 }}
                 className="w-full px-6 py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-bold text-lg"
               >
-                Cancel — Continue Game
+                Cancel — Continue Negotiation
               </button>
             )}
           </div>
