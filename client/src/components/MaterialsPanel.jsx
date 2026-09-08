@@ -38,7 +38,7 @@ export function MaterialsPanel({
   const role = { roleScoresheet, roleMultiplier, rolePriceRP };
   const threshold = batnaThreshold(type, roleRP);
 
-  const [activeTab, setActiveTab] = useState("calculator");
+  const [activeTab, setActiveTab] = useState("proposals");
   const [selectedOptions, setSelectedOptions] = useState({}); // { issue: optionIndex } (choice types)
   const [priceValue, setPriceValue] = useState(""); // string (price type)
   const [showFinalizeModal, setShowFinalizeModal] = useState(false);
@@ -53,6 +53,7 @@ export function MaterialsPanel({
   const hasSeenWelcomeModal = player.get("hasSeenWelcomeModal") || false;
   const [showWelcomeModal, setShowWelcomeModal] = useState(!hasSeenWelcomeModal);
   const [flashProposalTab, setFlashProposalTab] = useState(false);
+  const [wiggleStoppedId, setWiggleStoppedId] = useState(null); // proposal id whose wiggle the user interrupted
 
   // Get proposal history from round state (single source of truth)
   const history = round.get("proposalHistory") || [];
@@ -162,9 +163,9 @@ export function MaterialsPanel({
     return () => clearInterval(timer);
   }, [quitRequest?.startedAt, quitRequest?.by, player.id]);
 
-  // Flash the Proposal tab when there's a pending proposal
+  // Flash the Proposals tab when there's a pending proposal
   useEffect(() => {
-    if (pendingProposal && activeTab !== "proposal") {
+    if (pendingProposal && activeTab !== "proposals") {
       const interval = setInterval(() => {
         setFlashProposalTab(prev => !prev);
       }, 1000); // Flash every second
@@ -207,9 +208,6 @@ export function MaterialsPanel({
       modalDismissed: {}
     };
     round.set("proposalHistory", [...history, newProposal]);
-
-    // Switch to Proposal tab
-    handleTabChange("proposal");
   };
 
   // Handle vote on proposal (initial votes)
@@ -240,7 +238,7 @@ export function MaterialsPanel({
     } else {
       setSelectedOptions(proposal.options || {});
     }
-    handleTabChange("calculator");
+    handleTabChange("proposals");
   };
 
   // Handle finalize decision (finalize or continue)
@@ -291,26 +289,16 @@ export function MaterialsPanel({
           Narrative
         </button>
         <button
-          onClick={() => handleTabChange("calculator")}
+          onClick={() => handleTabChange("proposals")}
           className={`px-4 py-2 rounded font-medium transition-all border ${
-            activeTab === "calculator"
-              ? "bg-white text-blue-600 border-blue-400 shadow"
-              : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50 hover:border-gray-400"
-          }`}
-        >
-          Scoring
-        </button>
-        <button
-          onClick={() => handleTabChange("proposal")}
-          className={`px-4 py-2 rounded font-medium transition-all border ${
-            activeTab === "proposal"
+            activeTab === "proposals"
               ? "bg-white text-blue-600 border-blue-400 shadow"
               : pendingProposal && flashProposalTab
               ? "bg-red-100 text-red-700 border-red-400 shadow-md"
               : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50 hover:border-gray-400"
           }`}
         >
-          Proposal
+          Proposals
           {pendingProposal && (
             <span className="ml-2 inline-flex items-center justify-center w-2 h-2 bg-red-500 rounded-full"></span>
           )}
@@ -348,7 +336,7 @@ export function MaterialsPanel({
           </div>
         )}
 
-        {activeTab === "calculator" && (
+        {activeTab === "proposals" && (
           <div className="space-y-4">
             {/* BATNA Card */}
             <div className="bg-white rounded-lg shadow-sm p-4">
@@ -397,14 +385,15 @@ export function MaterialsPanel({
                 </div>
               }
             />
-          </div>
-        )}
 
-        {activeTab === "proposal" && (
-          <div className="space-y-4">
             {/* Pending Proposal */}
             {pendingProposal ? (
-              <div className="bg-white rounded-lg shadow-md p-6">
+              <div
+                onClick={() => setWiggleStoppedId(pendingProposal.id)}
+                className={`bg-white rounded-lg shadow-md p-6 ${
+                  wiggleStoppedId === pendingProposal.id ? "" : "animate-wiggle"
+                }`}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-bold text-gray-900">
                     Current Proposal
@@ -477,7 +466,7 @@ export function MaterialsPanel({
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow-md p-6 text-center">
-                <p className="text-gray-500">No pending proposal. Submit a proposal from the Scoring tab.</p>
+                <p className="text-gray-500">No pending proposal. Submit a proposal using the scoring calculator above.</p>
               </div>
             )}
 
@@ -838,7 +827,7 @@ export function MaterialsPanel({
                   You can videochat with other participants, review your role narrative, and vote on proposals.
                 </p>
                 <p className="text-red-600 text-opacity-80 font-semibold">
-                  To <strong>submit</strong> a proposal, click "Submit Proposal" in the scoring tab.
+                  To <strong>submit</strong> a proposal, click "Submit Proposal" in the Proposals tab.
                 </p>
                 <p>
                   <strong>To end the negotiation without an agreement, click "impasse."</strong>
