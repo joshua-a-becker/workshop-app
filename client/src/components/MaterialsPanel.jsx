@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import Markdown from "react-markdown";
 import { usePlayer, useStage, useRound, useGame } from "@empirica/core/player/classic/react";
+import { DailyCallContext } from "../App";
 import {
   ScoringCalculator,
   ProposalDetails,
@@ -49,9 +50,28 @@ export function MaterialsPanel({
   const [showQuitConfirmModal, setShowQuitConfirmModal] = useState(false);
   const [quitSecondsLeft, setQuitSecondsLeft] = useState(QUIT_COUNTDOWN_SECONDS);
 
+  const { isAudioEnabled, setIsAudioEnabled, isVideoEnabled, setIsVideoEnabled } =
+    useContext(DailyCallContext);
+
   // Check if welcome modal has been shown before (stored in player state)
   const hasSeenWelcomeModal = player.get("hasSeenWelcomeModal") || false;
   const [showWelcomeModal, setShowWelcomeModal] = useState(!hasSeenWelcomeModal);
+
+  // "Let's Go!" is disabled for the first few seconds to force reading.
+  const WELCOME_LOCK_SECONDS = 3;
+  const [welcomeSecondsLeft, setWelcomeSecondsLeft] = useState(WELCOME_LOCK_SECONDS);
+
+  // While the welcome modal is open we force mute + camera off; on "Let's Go!" we
+  // restore the state the player arrived with. We read that target at click time
+  // (not mount) so it's robust to a hard refresh: player state is hydrated by then,
+  // and the force-off path only touches context (never player.set), so
+  // player.get("audioEnabled"/"videoEnabled") still holds the untouched arrival state.
+  const restoreMediaState = () => {
+    const audio = player.get("audioEnabled");
+    const video = player.get("videoEnabled");
+    setIsAudioEnabled(audio !== undefined ? audio : true);
+    setIsVideoEnabled(video !== undefined ? video : true);
+  };
   const [flashProposalTab, setFlashProposalTab] = useState(false);
   const [wiggleStoppedId, setWiggleStoppedId] = useState(null); // proposal id whose wiggle the user interrupted
 
@@ -162,6 +182,21 @@ export function MaterialsPanel({
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [quitRequest?.startedAt, quitRequest?.by, player.id]);
+
+  // Count down the "Let's Go!" lock while the welcome modal is open.
+  useEffect(() => {
+    if (!showWelcomeModal || welcomeSecondsLeft <= 0) return;
+    const t = setTimeout(() => setWelcomeSecondsLeft(s => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [showWelcomeModal, welcomeSecondsLeft]);
+
+  // While the welcome modal is open, keep mic muted and camera off. Re-assert if
+  // anything (e.g. VideoChat's mount effect restoring saved state) turns them on.
+  useEffect(() => {
+    if (!showWelcomeModal) return;
+    if (isAudioEnabled) setIsAudioEnabled(false);
+    if (isVideoEnabled) setIsVideoEnabled(false);
+  }, [showWelcomeModal, isAudioEnabled, isVideoEnabled, setIsAudioEnabled, setIsVideoEnabled]);
 
   // Flash the Proposals tab when there's a pending proposal
   useEffect(() => {
@@ -823,9 +858,6 @@ export function MaterialsPanel({
                 It's Time to Negotiate!
               </h3>
               <div className="text-left text-gray-700 leading-relaxed space-y-3">
-                <p>
-                  You can videochat with other participants, review your role narrative, and vote on proposals.
-                </p>
                 <p className="text-red-600 text-opacity-80 font-semibold">
                   To <strong>submit</strong> a proposal, click "Submit Proposal" in the Proposals tab.
                 </p>
@@ -835,13 +867,20 @@ export function MaterialsPanel({
               </div>
             </div>
             <button
+              disabled={welcomeSecondsLeft > 0}
               onClick={() => {
                 player.set("hasSeenWelcomeModal", true);
                 setShowWelcomeModal(false);
+                // Restore to the audio/video state they arrived with.
+                restoreMediaState();
               }}
-              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-lg"
+              className={`w-full px-6 py-3 rounded-lg transition-colors font-semibold text-lg ${
+                welcomeSecondsLeft > 0
+                  ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
             >
-              Let's Go!
+              {welcomeSecondsLeft > 0 ? `Let's Go! (${welcomeSecondsLeft})` : "Let's Go!"}
             </button>
           </div>
         </div>
