@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useContext } from "react";
 import { usePlayer, usePlayers, useGame } from "@empirica/core/player/classic/react";
 import { DailyCallContext } from "../App";
 import { VolumeX, MicOff, VideoOff, Video } from "lucide-react";
+import { getTrackedUserMedia } from "../mediaTracks";
 
 // Layout constants for the best-fit grid search: the grid's gap (gap-2 = 8px)
 // and the vertical space each tile spends on its name row under the video.
@@ -333,14 +334,14 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null }) {
           audio: storedAudioDeviceId ? { deviceId: { exact: storedAudioDeviceId } } : true
         };
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const stream = await getTrackedUserMedia(constraints);
         setMediaStream(stream);
         // console.log("VideoChat: Media stream acquired");
       } catch (err) {
         console.error("VideoChat: Failed to get media stream:", err);
         // If specific devices fail, try with defaults
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({
+          const stream = await getTrackedUserMedia({
             video: true,
             audio: true
           });

@@ -5,7 +5,8 @@ import {
   useGame,
 } from "@empirica/core/player/classic/react";
 import { Loading } from "@empirica/core/player/react";
-import React, { useEffect } from "react";
+import React, { useContext, useEffect } from "react";
+import { DailyCallContext } from "./App";
 import { markExerciseComplete, saveExerciseOutcome } from "./clubApi";
 import { ReadRole } from "./components/ReadRole";
 import { ReadyToNegotiate } from "./components/ReadyToNegotiate";
@@ -17,6 +18,9 @@ export function Stage({ profileComponent }) {
   const players = usePlayers();
   const stage = useStage();
   const game = useGame();
+  const { teardownCall } = useContext(DailyCallContext);
+
+  const stageName = stage.get("name");
 
   // Force submit if an impasse was declared (game force-quit). Only during the
   // negotiation stage — forceQuit stays true afterwards, and the Debrief stage
@@ -31,6 +35,17 @@ export function Stage({ profileComponent }) {
     }
   }, [game.get("forceQuit"), stage, player]);
 
+  // The prep stages show no video, so fully release the Daily call and the local
+  // camera/mic here: the recording indicator goes dark and nothing is recorded.
+  // VideoChat re-acquires media and rejoins the game room when the negotiation
+  // stage mounts it. (This effect must run before any early return below to keep
+  // hook order stable.)
+  const isPrepStage =
+    stageName === "Read Negotiation Role" || stageName === "Ready To Negotiate";
+  useEffect(() => {
+    if (isPrepStage) teardownCall();
+  }, [isPrepStage, teardownCall]);
+
   if (player.stage.get("submit")) {
     if (players.length === 1) {
       return <Loading />;
@@ -42,8 +57,6 @@ export function Stage({ profileComponent }) {
       </div>
     );
   }
-
-  const stageName = stage.get("name");
 
   // Render component based on stage name
   if (stageName === "Read Negotiation Role") {

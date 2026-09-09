@@ -3,7 +3,6 @@ import { useGame, usePlayer, useRound, useStage } from "@empirica/core/player/cl
 import React, { useEffect } from "react";
 import { Profile } from "./Profile";
 import { Stage } from "./Stage";
-import { Heartbeat } from "./components/Heartbeat";
 import { ScenarioErrorPanel } from "./intro-exit/CustomLobby";
 
 export function Game() {
@@ -41,7 +40,6 @@ export function Game() {
 
   return (
     <div className="w-full flex flex-col">
-      <Heartbeat />
       <div className="w-full">
         <Stage profileComponent={<Profile />} />
       </div>

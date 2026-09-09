@@ -1,56 +1,35 @@
+# Treatments are generic. The negotiation scenario is NOT configured here — it
+# comes from each player's `?scenario=<name>` URL param, which the server turns
+# into {CLUB_BASE}/api/roles/<name>.json (see server/src/callbacks.js,
+# roleDataUrlFor). A `roleDataURL` factor used to live here; it was never read
+# and has been removed.
+#
+# Scenario-level settings (party count, prep_time, tips, debrief, price display)
+# all come from that role JSON too, so the only factors left are the ones the
+# server and client actually read.
 factors:
+    # Fallback game size for the lobby split preview. The real size is the number
+    # of roles in the scenario's JSON (callbacks.js, scenarioPlayerCount); this is
+    # only used when that can't be resolved yet.
     - name: playerCount
-      desc: playerCount determines the number of Players are in a Game.
+      desc: Fallback number of players per game when the scenario size is unknown.
       values:
-        - value: 1
         - value: 2
         - value: 3
+        - value: 4
         - value: 5
         - value: 8
-        - value: 13
-    - name: negotiateTime
+    # Duration of the post-negotiation debrief stage, in seconds. Read by
+    # callbacks.js (onGameStart) and client/src/components/Timer.jsx, which hides
+    # the countdown entirely when this exceeds 5 hours (i.e. self-paced).
+    - name: debriefTime
+      desc: Debrief stage duration in seconds; >18000 renders the stage self-paced.
       values:
-        - value: 100000
-        - value: 30000
         - value: 1800
-        - value: 300
-    - name: readRoleTime
-      values:
         - value: 100000
-        - value: 30000
-        - value: 300
-    - name: roleDatURL
-      values:
-        - value: https://raw.githubusercontent.com/joshua-a-becker/zopa-vs-complexity/refs/heads/main/server/src/roles_v1.json
-    - name: roleDataURL
-      values:
-        - value: https://raw.githubusercontent.com/joshua-a-becker/zopa-vs-complexity/refs/heads/main/server/src/roles_v1.json
-        - value: https://raw.githubusercontent.com/joshua-a-becker/zopa-vs-complexity/refs/heads/main/roles_v1.json
-        - value: roles_features_example.json
-        - value: roles_multiplechoice_example.json
-        - value: roles_price_example.json
-        - value: https://app.negotiation.education/api/roles/features_example.json
-        - value: https://app.negotiation.education/api/roles/price_example.json
-        - value: https://app.negotiation.education/api/roles/multiplechoice_example.json
 treatments:
-    - name: features_example
-      desc: Two-party apartment lease, include/exclude features (local file)
+    - name: negotiation
+      desc: Generic negotiation; the scenario comes from the player's ?scenario= link.
       factors:
-        negotiateTime: 1800
         playerCount: 2
-        readRoleTime: 300
-        roleDataURL: https://app.negotiation.education/api/roles/features_example.json
-    - name: price_example
-      desc: Two-party used-car sale, single price box (local file)
-      factors:
-        negotiateTime: 1800
-        playerCount: 2
-        readRoleTime: 300
-        roleDataURL: https://app.negotiation.education/api/roles/price_example.json
-    - name: multiplechoice_example
-      desc: Two-party job offer, one dropdown per issue (local file)
-      factors:
-        negotiateTime: 1800
-        playerCount: 2
-        readRoleTime: 300
-        roleDataURL: https://app.negotiation.education/api/roles/multiplechoice_example.json
+        debriefTime: 1800

@@ -50,8 +50,7 @@ export function MaterialsPanel({
   const [showQuitConfirmModal, setShowQuitConfirmModal] = useState(false);
   const [quitSecondsLeft, setQuitSecondsLeft] = useState(QUIT_COUNTDOWN_SECONDS);
 
-  const { isAudioEnabled, setIsAudioEnabled, isVideoEnabled, setIsVideoEnabled } =
-    useContext(DailyCallContext);
+  const { setMediaLocked } = useContext(DailyCallContext);
 
   // Check if welcome modal has been shown before (stored in player state)
   const hasSeenWelcomeModal = player.get("hasSeenWelcomeModal") || false;
@@ -61,17 +60,6 @@ export function MaterialsPanel({
   const WELCOME_LOCK_SECONDS = 3;
   const [welcomeSecondsLeft, setWelcomeSecondsLeft] = useState(WELCOME_LOCK_SECONDS);
 
-  // While the welcome modal is open we force mute + camera off; on "Let's Go!" we
-  // restore the state the player arrived with. We read that target at click time
-  // (not mount) so it's robust to a hard refresh: player state is hydrated by then,
-  // and the force-off path only touches context (never player.set), so
-  // player.get("audioEnabled"/"videoEnabled") still holds the untouched arrival state.
-  const restoreMediaState = () => {
-    const audio = player.get("audioEnabled");
-    const video = player.get("videoEnabled");
-    setIsAudioEnabled(audio !== undefined ? audio : true);
-    setIsVideoEnabled(video !== undefined ? video : true);
-  };
   const [flashProposalTab, setFlashProposalTab] = useState(false);
   const [wiggleStoppedId, setWiggleStoppedId] = useState(null); // proposal id whose wiggle the user interrupted
 
@@ -190,13 +178,14 @@ export function MaterialsPanel({
     return () => clearTimeout(t);
   }, [showWelcomeModal, welcomeSecondsLeft]);
 
-  // While the welcome modal is open, keep mic muted and camera off. Re-assert if
-  // anything (e.g. VideoChat's mount effect restoring saved state) turns them on.
+  // While the welcome modal is open, authoritatively force mic + camera off (the
+  // track effect in App.jsx honors this regardless of the per-toggle state, so it
+  // wins the mount-time race with VideoChat). Releasing the lock on "Let's Go!" /
+  // unmount reveals whatever state VideoChat maintains = the player's arrival state.
   useEffect(() => {
-    if (!showWelcomeModal) return;
-    if (isAudioEnabled) setIsAudioEnabled(false);
-    if (isVideoEnabled) setIsVideoEnabled(false);
-  }, [showWelcomeModal, isAudioEnabled, isVideoEnabled, setIsAudioEnabled, setIsVideoEnabled]);
+    setMediaLocked(showWelcomeModal);
+    return () => setMediaLocked(false);
+  }, [showWelcomeModal, setMediaLocked]);
 
   // Flash the Proposals tab when there's a pending proposal
   useEffect(() => {
@@ -870,9 +859,9 @@ export function MaterialsPanel({
               disabled={welcomeSecondsLeft > 0}
               onClick={() => {
                 player.set("hasSeenWelcomeModal", true);
+                // Releasing the media lock (via the showWelcomeModal effect) restores
+                // the audio/video state the player arrived with.
                 setShowWelcomeModal(false);
-                // Restore to the audio/video state they arrived with.
-                restoreMediaState();
               }}
               className={`w-full px-6 py-3 rounded-lg transition-colors font-semibold text-lg ${
                 welcomeSecondsLeft > 0

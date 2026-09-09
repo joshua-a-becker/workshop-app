@@ -2,7 +2,6 @@ import { ClassicListenersCollector } from "@empirica/core/admin/classic";
 import fetch from "node-fetch";
 import { execSync } from "child_process";
 import fs from "fs";
-import path from "path";
 
 // import rolesData from "./roles.json" assert { type: "json" };
 // const roles = rolesData.roles;
@@ -33,47 +32,6 @@ const PRESENCE_SWEEP_MS = 1000;
 // lobby roster before their first `lastSeen` ever arrives.
 const NEW_JOINER_GRACE_MS = 30000;
 
-// Absolute base directory for resolving relative role-data filenames. A bundled
-// Empirica server runs from its own extract/deploy dir, so `process.cwd()` no
-// longer points at the repo and bare filenames in treatments.yaml stop resolving.
-// Anchoring against this absolute base keeps short names like
-// `roles_price_example.json` working regardless of cwd. Override with ROLE_DATA_DIR.
-const ROLE_DATA_BASE_DIR = process.env.ROLE_DATA_DIR || "/home/claude/workshop-app";
-
-// Load role data from either a remote URL (http/https) or a local file path.
-// Absolute paths are read as-is. Relative names are resolved against
-// ROLE_DATA_BASE_DIR first (survives bundling), then a few cwd-relative bases so
-// it still works when launched from the project root or the server/ directory.
-function loadRoleData(source) {
-  if (/^https?:\/\//i.test(source)) {
-    // -f: fail on HTTP errors (404 etc.) so a missing scenario throws here
-    // instead of JSON.parse-ing an error page.
-    return JSON.parse(execSync(`curl -sf "${source}"`).toString());
-  }
-
-  const candidates = [
-    source,
-    path.resolve(ROLE_DATA_BASE_DIR, source),
-    path.resolve(process.cwd(), source),
-    path.resolve(process.cwd(), "..", source),
-  ];
-
-  for (const candidate of candidates) {
-    try {
-      if (fs.existsSync(candidate)) {
-        console.log(`[ROLES] Loading role data from local file: ${candidate}`);
-        return JSON.parse(fs.readFileSync(candidate, "utf8"));
-      }
-    } catch (err) {
-      // try the next candidate
-    }
-  }
-
-  throw new Error(
-    `[ROLES] Could not locate role data file from "${source}" (tried: ${candidates.join(", ")})`
-  );
-}
-
 // Which club serves this deployment's role data. The env var wins; otherwise
 // sniff this machine's Caddyfile: the prod box serves platform.negotiation.education
 // (→ app club), the dev box serves platformdev.negotiation.education (→ dev club).
@@ -100,25 +58,61 @@ function roleDataUrlFor(scenario) {
   return `${CLUB_BASE}/api/roles/${encodeURIComponent(scenario)}.json`;
 }
 
-// Fetch-and-cache scenario metadata (currently just the party count). Used to
-// validate a scenario when a player lands in the lobby and to size the lobby's
-// game-split preview. Successes are cached for the server's lifetime; failures
-// are NOT cached, so a scenario added to the club later starts working without
-// a restart.
-const scenarioInfoCache = new Map(); // roleDataURL -> { ok: true, size }
+// Role data is fetched from the club and cached per URL, with two TTLs:
+//  - positive: long enough that a lobby validation and the subsequent game
+//    start(s) share a single fetch; short enough that a scenario edited in the
+//    club's D1 goes live without restarting the server.
+//  - negative: failures used to be re-fetched on every player connect and every
+//    `scenario` write, so one bad link hammered the club. Caching the failure
+//    briefly stops that, while still letting a scenario added to the club later
+//    start working without a restart.
+const ROLE_DATA_TTL_MS = 60000;
+const ROLE_DATA_ERROR_TTL_MS = 10000;
+const roleDataCache = new Map(); // url -> { ts, data } | { ts, error }
+
+// Fetch a scenario's role JSON from the club, through the cache above. Throws on
+// failure (missing scenario, unreachable club, unparseable body); callers surface
+// that to the player and never fall back to another scenario.
+function fetchRoleData(url) {
+  const now = Date.now();
+  const cached = roleDataCache.get(url);
+  if (cached) {
+    const ttl = cached.error ? ROLE_DATA_ERROR_TTL_MS : ROLE_DATA_TTL_MS;
+    if (now - cached.ts <= ttl) {
+      if (cached.error) throw new Error(cached.error);
+      return cached.data;
+    }
+  }
+
+  try {
+    // -f: fail on HTTP errors (404 etc.) so a missing scenario throws here
+    //     instead of JSON.parse-ing an error page.
+    // -L: follow redirects. Without it a redirecting club returns an empty body,
+    //     which then reads as a broken scenario rather than a working one.
+    // --max-time: this is execSync, so an unresponsive club would otherwise block
+    //     the whole Node event loop indefinitely.
+    const data = JSON.parse(execSync(`curl -sfL --max-time 10 "${url}"`).toString());
+    roleDataCache.set(url, { ts: now, data });
+    return data;
+  } catch (err) {
+    const message = String(err?.message || err);
+    roleDataCache.set(url, { ts: now, error: message });
+    throw new Error(message);
+  }
+}
+
+// Scenario metadata (currently just the party count). Used to validate a scenario
+// when a player lands in the lobby and to size the lobby's game-split preview.
+// Reads through the same cache as the game-start fetch.
 function getScenarioInfo(scenario) {
   const url = roleDataUrlFor(scenario);
-  const cached = scenarioInfoCache.get(url);
-  if (cached) return cached;
   try {
-    const data = loadRoleData(url);
+    const data = fetchRoleData(url);
     const size = Array.isArray(data.roles) ? data.roles.length : 0;
     if (size < 2) {
       return { ok: false, url, error: `role data has ${size} roles (need >= 2)` };
     }
-    const info = { ok: true, url, size };
-    scenarioInfoCache.set(url, info);
-    return info;
+    return { ok: true, url, size };
   } catch (err) {
     return { ok: false, url, error: String(err?.message || err) };
   }
@@ -329,7 +323,6 @@ function sweepLobbyPresence(ctx) {
 
   for (const game of waitingGames) {
     const waitingPlayers = { ...(game.get("waitingPlayers") || {}) };
-    const groupAdmins = { ...(game.get("groupAdmins") || {}) };
     let changed = false;
 
     // A player belongs in this lobby roster iff Empirica still has them
@@ -356,7 +349,6 @@ function sweepLobbyPresence(ctx) {
         groupName,
         joinedAt: p.get("lobbyJoinedAt") ?? now,
       };
-      if (!groupAdmins[groupName]) groupAdmins[groupName] = p.id;
       changed = true;
       console.log(`[PRESENCE] Re-added ${p.id} to waiting game ${game.id} (group "${groupName}")`);
     }
@@ -368,35 +360,16 @@ function sweepLobbyPresence(ctx) {
       if (stillAssigned && isPresent(playerScope)) continue;
       const groupName = info.groupName || "default";
       delete waitingPlayers[playerId];
-      reassignAdmin(waitingPlayers, groupAdmins, groupName, playerId);
       changed = true;
       console.log(`[PRESENCE] Pruned ${playerId} from waiting game ${game.id} (group "${groupName}")`);
     }
 
     if (changed) {
       game.set("waitingPlayers", waitingPlayers);
-      game.set("groupAdmins", groupAdmins);
     }
   }
 
   if (waitingGames.length > 0) Empirica.flush();
-}
-
-// Reassign (or clear) the admin for a group after `removedPlayerId` has been
-// removed from `waitingPlayers`. Mutates `groupAdmins` in place. Safe to call
-// even when the removed player wasn't the admin.
-function reassignAdmin(waitingPlayers, groupAdmins, groupName, removedPlayerId) {
-  if (groupAdmins[groupName] !== removedPlayerId) return;
-  const next = Object.values(waitingPlayers).find(
-    p => p.groupName === groupName && p.id !== removedPlayerId
-  );
-  if (next) {
-    groupAdmins[groupName] = next.id;
-    console.log(`[ADMIN] Reassigned admin of group "${groupName}" to ${next.id}`);
-  } else {
-    delete groupAdmins[groupName];
-    console.log(`[ADMIN] Removed admin for empty group "${groupName}"`);
-  }
 }
 
 // Group players by groupName
@@ -642,7 +615,7 @@ Empirica.on("batch", "triggerAssignment", async (ctx, { batch }) => {
   }
 });
 
-// Listen for single group start trigger from group admin (using player attribute)
+// Listen for single group start trigger from any group member (using player attribute)
 Empirica.on("player", "requestStart", async (ctx, { player }) => {
   const requestStart = player.get("requestStart");
   console.log(`[PLAYER] requestStart listener triggered! Player ${player?.id}`, requestStart);
@@ -684,12 +657,9 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
 
   console.log(`[PLAYER] Found waiting game ${game.id}`);
 
-  // The admin machinery still runs (we read/track groupAdmins below), but the
-  // start request is no longer gated on it — any group member may start the game.
-  const groupAdmins = game.get("groupAdmins") || {};
+  // Starting is not gated on any per-group role — any group member may start.
   console.log(`[DIAG][requestStart] start requested`, {
     groupName,
-    adminForGroup: groupAdmins[groupName],
     requestingPlayerId,
     rosterIds: Object.keys(game.get("waitingPlayers") || {}),
   });
@@ -731,8 +701,8 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
   console.log(`[PLAYER] Looking up ${groupMembers.length} players:`, groupMembers.map(gm => gm.id));
   console.log(`[PLAYER] Available player IDs:`, allPlayers.map(p => p.id));
 
-  // Put the requesting admin at the front so the server's split matches the
-  // preview the admin saw in the modal (the client lists the admin first).
+  // Put the requesting player at the front so the server's split matches the
+  // preview they saw in the modal (the client lists the viewer first).
   const orderedMembers = [
     ...groupMembers.filter(gm => gm.id === requestingPlayerId),
     ...groupMembers.filter(gm => gm.id !== requestingPlayerId),
@@ -758,7 +728,7 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
   }
 
   // A game must be single-scenario. If the group somehow mixes scenarios, only start
-  // the admin's scenario; differently-scenario'd players stay in the lobby.
+  // the requesting player's scenario; differently-scenario'd players stay in the lobby.
   const startScenario = player.get("scenario");
   const sameScenario = playersToAssign.filter(p => p.get("scenario") === startScenario);
   if (sameScenario.length !== playersToAssign.length) {
@@ -768,8 +738,8 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
   // Per-scenario game size from the scenario's role JSON.
   const playerCount = scenarioPlayerCount(ctx, batch, startScenario);
 
-  // The admin assigns players to rooms by hand in the lobby modal and sends the
-  // result as `assignments`: an array (one entry per game room) of playerId
+  // The starting player assigns players to rooms by hand in the lobby modal and
+  // sends the result as `assignments`: an array (one entry per game room) of playerId
   // arrays. Anyone not listed — explicitly parked in the "Stay in Lobby" room or
   // otherwise omitted — stays in the lobby as a leftover. We fall back to the
   // legacy `mode` chunking only if a client sends no explicit assignments.
@@ -837,17 +807,6 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
     delete waitingPlayers[pid];
   }
   game.set("waitingPlayers", waitingPlayers);
-
-  if (leftovers.length > 0) {
-    // Prefer the original requester as the new admin if they're among the
-    // leftovers; otherwise pick the first leftover.
-    const newAdmin = leftovers.find(p => p.id === requestingPlayerId) || leftovers[0];
-    groupAdmins[groupName] = newAdmin.id;
-    console.log(`[PLAYER] Admin of group "${groupName}" is now leftover ${newAdmin.id}`);
-  } else {
-    delete groupAdmins[groupName];
-  }
-  game.set("groupAdmins", groupAdmins);
 
   // Clear requestStart for every involved player (assigned and leftovers).
   for (const p of playersToAssign) {
@@ -1079,14 +1038,6 @@ async function assignToWaitingGame(ctx, player) {
   };
   waitingGame.set("waitingPlayers", waitingPlayers);
 
-  // Track admin per group - first person in a group becomes admin
-  const groupAdmins = waitingGame.get("groupAdmins") || {};
-  if (!groupAdmins[playerGroupName]) {
-    groupAdmins[playerGroupName] = player.id;
-    waitingGame.set("groupAdmins", groupAdmins);
-    console.log(`[PLAYER] Player ${player.id} is now admin of group "${playerGroupName}"`);
-  }
-
   Empirica.flush();
   console.log(`[PLAYER] Updated waitingPlayers on game, now ${Object.keys(waitingPlayers).length} players`);
   console.log(`[DIAG][assign] assigned to waiting game`, {
@@ -1094,7 +1045,6 @@ async function assignToWaitingGame(ctx, player) {
     waitingGameId: waitingGame.id,
     groupName: playerGroupName,
     rosterIds: Object.keys(waitingPlayers),
-    groupAdmins,
   });
 
   // Create meeting token for player if room exists
@@ -1191,7 +1141,6 @@ Empirica.on("player", "groupName", async (ctx, { player }) => {
 
     if (game && game.get("isWaiting")) {
       const waitingPlayers = game.get("waitingPlayers") || {};
-      const oldGroupName = waitingPlayers[player.id]?.groupName;
 
       if (waitingPlayers[player.id]) {
         waitingPlayers[player.id].groupName = newGroupName;
@@ -1199,20 +1148,6 @@ Empirica.on("player", "groupName", async (ctx, { player }) => {
         game.set("waitingPlayers", waitingPlayers);
       }
 
-      // Update group admins
-      const groupAdmins = game.get("groupAdmins") || {};
-
-      if (oldGroupName) {
-        reassignAdmin(waitingPlayers, groupAdmins, oldGroupName, player.id);
-      }
-
-      // If new group has no admin, make this player admin
-      if (!groupAdmins[newGroupName]) {
-        groupAdmins[newGroupName] = player.id;
-        console.log(`[PLAYER] Player ${player.id} is now admin of group "${newGroupName}"`);
-      }
-
-      game.set("groupAdmins", groupAdmins);
       Empirica.flush();
       console.log(`[PLAYER] Updated waitingPlayers for player ${player.id} with groupName: ${newGroupName}`);
     }
@@ -1370,7 +1305,13 @@ Empirica.onGameStart(({ game }) => {
     isWaiting: game.get("isWaiting"),
     players: (game.players || []).map(p => p.id),
     scenario: game.get("scenario"),
-    roleDataURL,
+    // Labelled `roleSource`, NOT `roleDataURL`: the line above dumps the whole
+    // treatment, and batches created before treatments.yaml was cleaned up still
+    // carry an inert `roleDataURL` factor with a different (never-fetched) value.
+    // Two identical key names in adjacent log lines read as an override that
+    // isn't happening. This one is the URL actually fetched.
+    roleSource: roleDataURL,
+    clubBase: CLUB_BASE,
   });
 
   if (!roleDataURL) {
@@ -1382,7 +1323,7 @@ Empirica.onGameStart(({ game }) => {
 
   let rolesData;
   try {
-    rolesData = loadRoleData(roleDataURL);
+    rolesData = fetchRoleData(roleDataURL);
   } catch (err) {
     console.error(`[GAME START] Game ${game.id} failed to load role data from ${roleDataURL}:`, err);
     (game.players || []).forEach(p => p.set("scenarioError", `Could not load scenario "${game.get("scenario")}". Please use the link provided for your session.`));
@@ -1547,9 +1488,6 @@ Empirica.onGameStart(({ game }) => {
   });
 
 
-  // Initialize participant timestamps for presence tracking via Daily.co API
-  game.set("participantTimestamps", {});
-
   // initialize rounds and stages
     // ROUND 1 -- Assign actual task based on flipOrder
   const round = game.addRound({
@@ -1589,103 +1527,9 @@ Empirica.onGameStart(({ game }) => {
 
 });
 
-// Handle stage start for video stages
-Empirica.onStageStart(({ stage }) => {
-  
-  console.log("stage starting")
-
-  // this code block keeps track of whether players have left the game
-  // piggybacking on daily.co tracking
-  // Initialize timestamps for all players at stage start
-  const game = stage.round.currentGame;
-  const initialTimestamps = {};
-  game.players.forEach(player => {
-    initialTimestamps[player.id] = Date.now();
-  });
-  game.set("participantTimestamps", initialTimestamps);
-  Empirica.flush();
-
-  // Monitor Daily.co participant presence every 5 seconds
-  const monitorInterval = setInterval(async () => {
-
-    const currentGame = stage.round.currentGame;
-    const currentStage = currentGame.currentStage;
-
-    // Check if we're still on the stage that created this interval
-    if (!currentStage || currentStage.id !== stage.id) {
-      return; // This interval is for an old stage, don't run
-    }
-
-    const game = stage.round.currentGame;
-    const timestamps = game.get("participantTimestamps") || {};
-    const now = Date.now();
-
-    // Get Daily.co participants to update timestamps
-    const DAILY_API_KEY = "4a8717f69efe0168244b69d4d4aa0aad4faafbe31c94d69853d590eeeb916290";
-    const roomUrl = game.get("roomUrl");
-
-    if (roomUrl) {
-      try {
-        // Extract room name from URL (e.g., "https://company.daily.co/roomname" -> "roomname")
-        const roomName = roomUrl.split('/').pop();
-
-        // Fetch current participants from Daily.co presence API
-        const res = await fetch(`https://api.daily.co/v1/rooms/${roomName}/presence`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${DAILY_API_KEY}`,
-          }
-        });
-
-        const data = await res.json();
-
-
-        if (data && data.data) {
-          // Get list of player IDs currently in the call
-
-          const activePlayerIds = data.data.map(p => p.userId);
-
-          game.set("activeDailyCalls", data.data)
-
-          // Update timestamps for players who are in the Daily call
-          game.players.forEach(player => {
-            if (activePlayerIds.includes(player.id)) {
-              // LOOK HERE FOR MYSTERY
-              // console.log(player.id + " is active")
-              timestamps[player.id] = now;
-              // console.log(timestamps)
-            }
-          });
-
-          // Save updated timestamps
-          // console.log("Saved timestamps:", timestamps);
-          game.set("participantTimestamps", timestamps);
-          Empirica.flush();
-          // Object.entries(game.get("participantTimestamps")).forEach(([k,v]) => console.log(k + " : " + ((v-Date.now())/1000) ))
-        }
-      } catch (error) {
-        console.error("Error fetching Daily participants:", error);
-        // Continue with existing timestamps if API call fails
-      }
-    }
-
-    // Staleness check against each player's self-heartbeat (`lastSeen`,
-    // written by client/src/components/Heartbeat.jsx). `participantTimestamps`
-    // above is kept as a parallel Daily-side cross-check.
-    game.players.forEach(player => {
-      if (player.get("leftAt")) return; // Already marked; don't re-fire.
-
-      const lastSeen = player.get("lastSeen");
-      const lastTs = lastSeen?.ts;
-      if (!lastTs) return; // Never heartbeated yet — wait for first tick.
-
-      if (now - lastTs > PRESENCE_STALE_MS) {
-        player.set("leftAt", now);
-        const displayName = player.get("displayName") || "Unknown";
-        console.log(`[PRESENCE] Player ${player.id} (${displayName}) marked as left (last seen ${Math.round((now - lastTs)/1000)}s ago)`);
-      }
-    });
-    Empirica.flush();
-  }, 5000);
-
-});
+// NOTE: there is deliberately no onStageStart presence monitor. It polled Daily's
+// presence API every 5s per stage to maintain `participantTimestamps`,
+// `activeDailyCalls` and `leftAt` — none of which were ever read. Its timers were
+// also never cleared, so finished games kept calling Daily for weeks. In-game
+// presence is Daily's own concern; lobby presence uses the client heartbeat
+// (`lastSeen`) via sweepLobbyPresence above.

@@ -7,7 +7,7 @@ import { Heartbeat } from "../components/Heartbeat.jsx";
 
 // Client-side mirror of the server's three chunking strategies. Same rules;
 // same inputs. Used to render the preview inside the assignment modal so the
-// admin can see exactly what will happen before confirming.
+// player starting the game can see exactly what will happen before confirming.
 function chunkExact(members, P) {
   const n = members.length;
   const fullGroups = Math.floor(n / P);
@@ -88,7 +88,7 @@ function initials(name) {
 }
 
 // A colored circle with the player's initials. `empty` renders a dashed
-// placeholder slot instead — an open seat the admin can drop someone into.
+// placeholder slot instead — an open seat they can drop someone into.
 function Avatar({ player, empty = false, size = "w-9 h-9 text-xs" }) {
   if (empty || !player) {
     return (
@@ -108,7 +108,7 @@ function Avatar({ player, empty = false, size = "w-9 h-9 text-xs" }) {
   );
 }
 
-// Selectable avatar+name token for a single player. Draggable, so the admin can
+// Selectable avatar+name token for a single player. Draggable, so the starting player can
 // either click-select-then-click-a-room, or just drag the chip onto a room.
 function PlayerChip({ player, selected, onClick, onDragStart, onDragEnd }) {
   return (
@@ -182,11 +182,6 @@ function CustomLobbyInner() {
   // Get waitingPlayers from game (stored by server since usePlayers() doesn't work in lobby)
   const waitingPlayersObj = game?.get("waitingPlayers") || {};
 
-  // Check if current player is admin of their group
-  const groupAdmins = game?.get("groupAdmins") || {};
-  const adminId = groupAdmins[myGroupName];
-  const isAdmin = adminId === player?.id;
-
   // Filter players to show only those in the same group (excluding self)
   const groupMembers = useMemo(() => {
     const members = [];
@@ -202,9 +197,8 @@ function CustomLobbyInner() {
     return members;
   }, [waitingPlayersObj, myGroupName, player?.id]);
 
-  // Calculate total group members and whether game can start. The admin
-  // machinery still runs silently in the background, but the start gate is no
-  // longer tied to it — any group member can start once there are 2+ players.
+  // Calculate total group members and whether game can start. Any group member
+  // can start once there are 2+ players.
   const totalGroupMembers = groupMembers.length + 1; // +1 for current player
   const canStartGame = totalGroupMembers >= 2;
 
@@ -223,7 +217,7 @@ function CustomLobbyInner() {
   }, [groupMembers]);
 
   // Flat roster (self first) for the assignment modal: id + display name, plus
-  // a flag marking which one is the admin doing the assigning.
+  // an `isSelf` flag marking which one is the viewer.
   const myDisplayName = player?.get("displayName");
   const assignmentPlayers = useMemo(() => {
     const list = [];
@@ -240,8 +234,8 @@ function CustomLobbyInner() {
   const hasVideoRoom = game?.get("roomUrl") && player?.get("dailyMeetingToken");
   const hasCompletedIntro = player?.get("introDone");
 
-  // [DIAG] Full lobby snapshot every render: who am I, what game am I attached to,
-  // am I admin, and the roster the client sees.
+  // [DIAG] Full lobby snapshot every render: who am I, what game am I attached
+  // to, and the roster the client sees.
   console.log("[DIAG][lobby] render", {
     playerId: player?.id,
     gameID: player?.get("gameID"),
@@ -251,8 +245,6 @@ function CustomLobbyInner() {
     introDone: player?.get("introDone"),
     scenario: player?.get("scenario"),
     myGroupName,
-    adminId,
-    isAdmin,
     totalGroupMembers,
     canStartGame,
     rosterIds: Object.keys(waitingPlayersObj),
@@ -276,14 +268,14 @@ function CustomLobbyInner() {
     return () => console.log("[DIAG][lobby] CustomLobby UNMOUNTED", { playerId: player?.id });
   }, []);
 
-  // Assignment modal state. Clicking Start opens the modal; the admin assigns
+  // Assignment modal state. Clicking Start opens the modal; that player assigns
   // players to rooms by hand (or via Random Assign); Confirm sends the explicit
   // room→player mapping along with requestStart.
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
 
   const openAssignmentModal = () => {
     console.log("[DIAG][lobby] openAssignmentModal click", {
-      playerId: player?.id, isAdmin, hasGame: !!game, hasPlayer: !!player,
+      playerId: player?.id, hasGame: !!game, hasPlayer: !!player,
     });
     if (!game || !player) {
       console.warn("[DIAG][lobby] openAssignmentModal BLOCKED - no game/player");
@@ -296,7 +288,7 @@ function CustomLobbyInner() {
   // Players left unassigned are simply omitted — they stay in the lobby.
   const confirmStartGame = (assignments) => {
     console.log("[DIAG][lobby] confirmStartGame click", {
-      playerId: player?.id, isAdmin, gameId: game?.id, gameID: player?.get("gameID"), assignments,
+      playerId: player?.id, gameId: game?.id, gameID: player?.get("gameID"), assignments,
     });
     if (!game || !player) {
       console.warn("[DIAG][lobby] confirmStartGame BLOCKED - no game/player");
@@ -312,10 +304,6 @@ function CustomLobbyInner() {
 
     setShowAssignmentModal(false);
   };
-
-  // The admin machinery (assignment/reassignment) still runs on the server, but
-  // it's silent here — players are never notified when they become admin, and the
-  // start button is available to everyone regardless.
 
   return (
     <div className="h-screen w-screen bg-gray-100 flex">
@@ -440,10 +428,10 @@ function RoomMemberToken({ player, selected, onSelect, onDragStart, onDragEnd })
   );
 }
 
-// Manual assignment modal. The admin selects a player, then clicks a room (or
+// Manual assignment modal. The starting player selects a player, then clicks a room (or
 // the unassigned pool) to place them there. Rooms start empty; there are as
 // many as could ever be needed — floor(N/2), since a game needs >= 2 players —
-// so the admin can leave some empty if they want fewer/larger games. Anyone left
+// so they can leave some empty if they want fewer/larger games. Anyone left
 // in the unassigned pool simply stays in the lobby for this round. Random Assign
 // auto-fills the rooms for review.
 function AssignmentModal({ players, playerCount, onCancel, onConfirm }) {
@@ -453,7 +441,7 @@ function AssignmentModal({ players, playerCount, onCancel, onConfirm }) {
   // pool (stays in lobby).
   const [assignments, setAssignments] = useState({});
   const [selectedId, setSelectedId] = useState(null);
-  // When set, holds the shuffled roster awaiting the admin's answer to the
+  // When set, holds the shuffled roster awaiting the starting player's answer to the
   // exact-vs-double-up question before Random Assign fills the rooms.
   const [pendingShuffle, setPendingShuffle] = useState(null);
 
@@ -816,7 +804,7 @@ function AssignmentModal({ players, playerCount, onCancel, onConfirm }) {
   );
 }
 
-// Shown when the admin starts with non-blocking issues (unassigned players, or
+// Shown when starting with non-blocking issues (unassigned players, or
 // games smaller/larger than recommended). Lists each issue and lets them go
 // back and fix it, or start anyway.
 function StartWarningDialog({ warnings, onCancel, onConfirm }) {

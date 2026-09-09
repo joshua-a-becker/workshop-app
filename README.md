@@ -1,6 +1,6 @@
 # Group Negotiation Experiment Platform
 
-A real-time, multi-party video negotiation experiment platform built with [Empirica](https://empirica.ly/) v1.12.5 and [Daily.co](https://www.daily.co/). Participants are assigned fictional roles and negotiate via live video chat, using a structured proposal submission and voting system. The negotiation scenario is fully configurable via a `roleDataURL` treatment factor that points to a JSON file defining roles, scoresheets, and tips.
+A real-time, multi-party video negotiation experiment platform built with [Empirica](https://empirica.ly/) v1.12.5 and [Daily.co](https://www.daily.co/). Participants are assigned fictional roles and negotiate via live video chat, using a structured proposal submission and voting system. The negotiation scenario is selected per session by a `?scenario=` URL parameter, which names a JSON file of roles, scoresheets, and tips served from the club app.
 
 **Principal Investigator:** Joshua Becker, University College London (UCL)
 **Contact:** joshua.becker@ucl.ac.uk
@@ -34,7 +34,15 @@ A real-time, multi-party video negotiation experiment platform built with [Empir
 
 ### Negotiation Scenario
 
-The platform is **scenario-agnostic**. The negotiation scenario is defined entirely by external role data loaded at game start from the `roleDataURL` treatment factor, which may be either a **remote URL** or a **local file path** in the repo. This means the same platform can run any negotiation by simply pointing to a different JSON file.
+The platform is **scenario-agnostic**. Treatments carry no scenario information at all; the negotiation is defined entirely by external role data fetched at game start from the club app:
+
+```
+?scenario=<name>  →  {CLUB_BASE}/api/roles/<name>.json
+```
+
+`<name>` comes from each player's link. `CLUB_BASE` is resolved once at server startup — the `CLUB_BASE` env var if set, otherwise sniffed from `/etc/caddy/Caddyfile` (`platform.negotiation.education` → `https://app.negotiation.education`, else `https://dev.negotiation.education`). The role JSON itself lives in the club's D1 database. This means the same platform can run any negotiation by handing participants a different link.
+
+An unknown scenario is **not** silently replaced with a default: the server records a `scenarioError` on the player and the lobby renders an error panel instead of letting the game start.
 
 The platform supports **three negotiation types**, identified by a `type` field in the role data (see [Negotiation Types](#negotiation-types) and [Role Data Format](#role-data-format)):
 
@@ -51,12 +59,12 @@ Each player receives a private role with:
 
 All three types share one unifying concept — **value** (the term shown throughout the UI). The same rule applies everywhere: **never accept a deal worth less than 0**. Players negotiate via live video call while using an interactive scoring calculator and formal proposal system. Issues typically have asymmetric values across roles, creating opportunities for integrative bargaining where parties trade low-value items for high-value ones.
 
-**Included example scenarios** (in the repo root) — one per type:
-- `roles_features_example.json` — Two-party apartment lease, 6 include/exclude terms (`features`)
-- `roles_multiplechoice_example.json` — Two-party job offer, 4 issues × 3 ordered options (`multiple_choice`)
-- `roles_price_example.json` — Two-party used-car sale, ZOPA $12k–$20k (`price`)
+**Example scenarios** — one per type, served by the club as `?scenario=<name>`:
+- `features_example` — Two-party apartment lease, 6 include/exclude terms (`features`)
+- `multiplechoice_example` — Two-party job offer, 4 issues × 3 ordered options (`multiple_choice`)
+- `price_example` — Two-party used-car sale, ZOPA $12k–$20k (`price`)
 
-Plus `roles_v1.json` / `roles_v2.json` — the original three-party vacation-planning `features` scenarios. These are all examples; any scenario following the role data schema can be used.
+Any scenario following the role data schema can be used; see [Role Data Format](#role-data-format) for how to add one.
 
 ### Experiment Flow
 
@@ -176,8 +184,6 @@ group-negotiation/
 │   ├── package.json
 │   └── jsconfig.json
 │
-├── roles_v1.json                        # Role data version 1 (detailed narratives with backstory)
-├── roles_v2.json                        # Role data version 2 (simplified narratives)
 └── .empirica/                           # Empirica configuration directory
     ├── empirica.toml                    # App name + admin dashboard credentials
     ├── treatments.yaml                  # Factors + named treatments (conditions)
@@ -564,7 +570,7 @@ When `ENABLE_AUTO_ASSIGNMENT = true` in `callbacks.js`:
 
 When a game starts, the server:
 
-1. **Loads role data** from `treatment.roleDataURL` via `loadRoleData()` — a remote URL is fetched with `curl`, otherwise the value is treated as a local file path resolved relative to the project root
+1. **Loads role data** from `game.roleDataURL` via `fetchRoleData()` — the URL was built at game creation from the players' `?scenario=` and `CLUB_BASE`, and is fetched with `curl` through a short-lived cache (60s for a successful fetch, 10s for a failure, so a burst of game starts costs one request and a bad scenario can't hammer the club)
 2. **Reads the negotiation type** (`rolesData.type`, default `"features"`) and stores it as `game.negotiationType`; for `price` it also stores `game.priceConfig`
 3. **Creates a Daily.co video room** for the game (4-hour expiry, raw-track recording, transcription storage enabled)
 4. **Generates meeting tokens** for each player with transcription permissions
@@ -778,11 +784,15 @@ choice types it is the role's `RP`.
 
 ## Role Data Format
 
-Role data is loaded at game start from the `roleDataURL` treatment factor, which may
-be **either a remote URL** (fetched via `curl`) **or a local file path** relative to
-the project root (e.g. `roles_price_example.json`). This is the key configuration
-point for defining different negotiation scenarios — the platform itself is
-scenario-agnostic.
+Role data is fetched at game start from `{CLUB_BASE}/api/roles/<scenario>.json`, where
+`<scenario>` is the player's `?scenario=` URL parameter and `CLUB_BASE` is this
+deployment's club app (see [Negotiation Scenario](#negotiation-scenario)). The JSON is
+stored in the club's D1 database. This is the key configuration point for defining
+different negotiation scenarios — the platform itself is scenario-agnostic, and
+treatments carry no scenario information.
+
+Beyond the roles themselves, the JSON also supplies `type`, `tips`, `prep_time` (role
+reading time, in minutes), `debrief`, and — for `price` — `price_config`.
 
 ### Schema — `features` (default)
 
@@ -939,21 +949,18 @@ To create a new negotiation scenario:
    `rp` above seller `rp`).
 4. Set BATNA values (`RP` for choice types; for `price` the no-deal value is `0`).
 5. Write narrative text and tips.
-6. Either host the JSON at a public URL **or** drop it in the repo root.
-7. Set `roleDataURL` to that URL or file path in the Empirica treatment configuration.
+6. Add the JSON to the club's D1 role table so it is served at
+   `{CLUB_BASE}/api/roles/<name>.json` (see `backfill-role-data.sql` in the
+   negotiation-club repo).
+7. Hand participants a link with `?scenario=<name>`. No treatment change is needed.
 
 ### Included Example Scenarios
 
 One canonical example per type:
 
-- **`roles_features_example.json`** (`features`) — Two-party apartment lease; 6 include/exclude terms (pet allowance, parking, gym, repaint, early move-in, two-year term) with asymmetric scores that reward logrolling.
-- **`roles_multiplechoice_example.json`** (`multiple_choice`) — Two-party job offer; 4 issues (salary, start date, leave, remote days) × 3 ordered options each, with asymmetric scores that reward logrolling.
-- **`roles_price_example.json`** (`price`) — Two-party used-car sale; buyer `rp` $20,000, seller `rp` $12,000 → ZOPA $12,000–$20,000.
-
-Plus the original three-party `features` scenarios:
-
-- **`roles_v1.json`** — Three-party vacation planning with detailed backstory narratives. 8 negotiable features.
-- **`roles_v2.json`** — Three-party vacation planning with simplified narratives. Same 8 features, different scores.
+- **`features_example`** (`features`) — Two-party apartment lease; 6 include/exclude terms (pet allowance, parking, gym, repaint, early move-in, two-year term) with asymmetric scores that reward logrolling.
+- **`multiplechoice_example`** (`multiple_choice`) — Two-party job offer; 4 issues (salary, start date, leave, remote days) × 3 ordered options each, with asymmetric scores that reward logrolling.
+- **`price_example`** (`price`) — Two-party used-car sale; buyer `rp` $20,000, seller `rp` $12,000 → ZOPA $12,000–$20,000.
 
 ---
 
@@ -963,11 +970,13 @@ Treatments are configured via the Empirica admin panel when creating batches.
 
 | Factor | Type | Default | Description |
 |--------|------|---------|-------------|
-| `playerCount` | Number | varies | Players per negotiation game |
-| `readRoleTime` | Number | 300 | Seconds for role reading stage (5 min) |
-| `negotiateTime` | Number | 1800 | Seconds for negotiation stage (30 min). Values **over 18000 (5 hours)** hide the countdown timer during the negotiate stage, giving "unlimited" time without changing the layout. |
-| `debriefTime` | Number | 1800 | Seconds for the Debrief & Discussion stage (30 min). Like `negotiateTime`, values **over 18000 (5 hours)** hide the countdown timer during the debrief stage. |
-| `roleDataURL` | String | — | URL **or local file path** for the role JSON data (e.g., a hosted `roles_v1.json`, or `roles_price_example.json` in the repo root) |
+| `playerCount` | Number | 2 | Fallback players per game, used only for the lobby split preview when the scenario's party count can't be resolved. The real size is the number of roles in the scenario JSON. |
+| `debriefTime` | Number | 1800 | Seconds for the Debrief & Discussion stage (30 min). Values **over 18000 (5 hours)** hide the countdown timer during the debrief stage. |
+
+Role reading time comes from the scenario JSON's `prep_time` (minutes), not a factor.
+Negotiation time is effectively unlimited — the stage ends on agreement or impasse, not
+on a clock. `roleDataURL`, `readRoleTime` and `negotiateTime` were treatment factors
+historically; they are gone, and the scenario now comes from `?scenario=`.
 
 ---
 
