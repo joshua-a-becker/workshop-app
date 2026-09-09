@@ -263,7 +263,10 @@ export default function App() {
       // Mark intro complete so the lobby enables video once we arrive there.
       // (DisplayNameEntry sets displayName from the URL on auto-submit.)
       player.set("introDone", true);
-      player.set("groupName", urlParams.get("groupName") || "default");
+      // Sentinel, not "default" — see NO_GROUP_NAME in CustomLobby.jsx. A
+      // skipIntro link with no ?groupName= is an incomplete link, and the lobby
+      // refuses it rather than dropping the player into a shared bucket.
+      player.set("groupName", urlParams.get("groupName") || "null061486");
       player.set("scenario", urlParams.get("scenario") || "");
 
       return [DisplayNameEntry];

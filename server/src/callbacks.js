@@ -22,6 +22,13 @@ let pollingStarted = false;
 // clicks can race and create two games for the same people. Keyed by
 // `${waitingGameId}:${groupName}`.
 const startInFlight = new Set();
+// Stands in for "this player has not told us their group name yet". Deliberately
+// not "default": that is a name a participant may legitimately type, and the two
+// must stay distinguishable — an absent name means an incomplete link and is
+// refused, a chosen one is honoured. Nothing should ever run a real lobby under
+// this value; it exists so absence is detectable. Must match NO_GROUP_NAME in
+// client/src/intro-exit/CustomLobby.jsx.
+const NO_GROUP_NAME = "null061486";
 // The "batch" and "batch"/"status" listeners both call createWaitingGame, whose
 // existence check is separated from addGame by an await. Keyed by batch id, and
 // holding the promise so a second caller shares the first one's result.
@@ -113,9 +120,10 @@ function fetchRoleData(url) {
   }
 }
 
-// Scenario metadata (currently just the party count). Used to validate a scenario
-// when a player lands in the lobby and to size the lobby's game-split preview.
-// Reads through the same cache as the game-start fetch.
+// Scenario metadata: the party count, and the scenario's human title (`name` in
+// the role JSON — e.g. "The Vacation"). Used to validate a scenario when a player
+// lands in the lobby, to size the lobby's game-split preview, and to label the
+// lobby. Reads through the same cache as the game-start fetch.
 function getScenarioInfo(scenario) {
   const url = roleDataUrlFor(scenario);
   try {
@@ -124,9 +132,60 @@ function getScenarioInfo(scenario) {
     if (size < 2) {
       return { ok: false, url, error: `role data has ${size} roles (need >= 2)` };
     }
-    return { ok: true, url, size };
+    return { ok: true, url, size, name: data.name || "" };
   } catch (err) {
     return { ok: false, url, error: String(err?.message || err) };
+  }
+}
+
+// Daily requests fail for two very different reasons, and only one is worth
+// retrying: a transient blip (network error, rate limit, 5xx) that the next
+// attempt will probably survive, versus a rejected request (bad key, a property
+// the plan does not allow) that will fail identically forever. Rooms are created
+// once per batch and once per game with no other retry anywhere, so without this
+// a two-second outage landing at the wrong instant leaves a whole session — or a
+// whole negotiation — with no video and only a line in the server log.
+const DAILY_RETRY_DELAYS_MS = [500, 1500, 4000];
+
+// No status means the request threw before any response (network, DNS, timeout).
+function dailyIsTransient(status) {
+  return status === undefined || status === 429 || status >= 500;
+}
+
+async function dailyRequest(label, path, body) {
+  for (let attempt = 0; ; attempt++) {
+    let status;
+    let detail;
+    try {
+      const res = await fetch(`https://api.daily.co/v1/${path}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${DAILY_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      status = res.status;
+      detail = await res.json();
+      if (res.ok) return { ok: true, data: detail };
+    } catch (err) {
+      detail = String(err?.message || err);
+    }
+
+    const last = attempt >= DAILY_RETRY_DELAYS_MS.length;
+    if (!dailyIsTransient(status) || last) {
+      console.error(
+        `[DAILY] ${label} failed${status ? ` (HTTP ${status})` : ""} after ${attempt + 1} attempt(s):`,
+        detail
+      );
+      return { ok: false, status, data: detail };
+    }
+
+    const delay = DAILY_RETRY_DELAYS_MS[attempt];
+    console.warn(
+      `[DAILY] ${label} attempt ${attempt + 1} failed${status ? ` (HTTP ${status})` : ""}, retrying in ${delay}ms`
+    );
+    await new Promise(resolve => setTimeout(resolve, delay));
   }
 }
 
@@ -134,78 +193,51 @@ function getScenarioInfo(scenario) {
 async function createDailyRoom(roomName) {
   const roomExp = Math.round(Date.now() / 1000) + 60 * 60 * 8; // 8 hour expiry
 
-  try {
-    const res = await fetch("https://api.daily.co/v1/rooms", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${DAILY_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: roomName,
-        properties: {
-          exp: roomExp,
-          enable_recording: "raw-tracks",
-          enable_transcription_storage: true,
-        },
-      }),
-    });
+  const res = await dailyRequest(`create waiting room ${roomName}`, "rooms", {
+    name: roomName,
+    properties: {
+      exp: roomExp,
+      enable_recording: "raw-tracks",
+      enable_transcription_storage: true,
+    },
+  });
 
-    const data = await res.json();
-    if (!data.url) {
-      console.error("[DAILY] Failed to create room:", data);
-      return null;
-    }
-    console.log(`[DAILY] Room created: ${data.url}`);
-    return { url: data.url, roomName, expiry: roomExp };
-  } catch (error) {
-    console.error("[DAILY] Error creating room:", error);
+  if (!res.ok || !res.data?.url) {
     return null;
   }
+
+  console.log(`[DAILY] Room created: ${res.data.url}`);
+  return { url: res.data.url, roomName, expiry: roomExp };
 }
 
 // Helper function to create meeting token for a player
 async function createMeetingToken(roomName, player, expiry) {
-  try {
-    const displayName = player.get("displayName") || "Anonymous";
-    const userName = `${displayName} - Player ${player.id}`;
+  const displayName = player.get("displayName") || "Anonymous";
+  const userName = `${displayName} - Player ${player.id}`;
 
-    // Always use a fresh expiry (8 hours from now) to avoid stale timestamps
-    const freshExpiry = Math.round(Date.now() / 1000) + 60 * 60 * 8;
-    const tokenExpiry = expiry > Math.round(Date.now() / 1000) ? expiry : freshExpiry;
+  // Always use a fresh expiry (8 hours from now) to avoid stale timestamps
+  const freshExpiry = Math.round(Date.now() / 1000) + 60 * 60 * 8;
+  const tokenExpiry = expiry > Math.round(Date.now() / 1000) ? expiry : freshExpiry;
 
-    const res = await fetch("https://api.daily.co/v1/meeting-tokens", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${DAILY_API_KEY}`,
-        "Content-Type": "application/json",
+  const res = await dailyRequest(`create token for ${displayName}`, "meeting-tokens", {
+    properties: {
+      room_name: roomName,
+      user_name: userName,
+      user_id: player.id,
+      is_owner: false,
+      permissions: {
+        canAdmin: ["transcription"]
       },
-      body: JSON.stringify({
-        properties: {
-          room_name: roomName,
-          user_name: userName,
-          user_id: player.id,
-          is_owner: false,
-          permissions: {
-            canAdmin: ["transcription"]
-          },
-          exp: tokenExpiry,
-        },
-      }),
-    });
+      exp: tokenExpiry,
+    },
+  });
 
-    const tokenData = await res.json();
-    if (tokenData.token) {
-      console.log(`[DAILY] Created token for player ${displayName}`);
-      return tokenData.token;
-    } else {
-      console.error(`[DAILY] Failed to create token for ${displayName}:`, tokenData);
-      return null;
-    }
-  } catch (err) {
-    console.error(`[DAILY] Error creating token for player ${player.id}:`, err);
+  if (!res.ok || !res.data?.token) {
     return null;
   }
+
+  console.log(`[DAILY] Created token for player ${displayName}`);
+  return res.data.token;
 }
 
 // Read the configured target game size. Prefer the treatment attached to an
@@ -283,6 +315,9 @@ async function doCreateWaitingGame(ctx, batch) {
   // validateScenario fills it in as each player's scenario resolves against the
   // club's role JSON.
   const scenarioSizes = {};
+  // Per-scenario human titles (role JSON `name`), filled in by validateScenario
+  // the same way. The lobby labels itself with these, never with the URL slug.
+  const scenarioNames = {};
 
   // batch.addGame() returns a lightweight proxy without assignPlayer/id.
   // We create it, then look up the real Game object from the context.
@@ -300,6 +335,7 @@ async function doCreateWaitingGame(ctx, batch) {
     { key: "dailyRoomExpiry", value: roomData?.expiry || null },
     { key: "gamePlayerCount", value: cfgPlayerCount },
     { key: "scenarioSizes", value: scenarioSizes },
+    { key: "scenarioNames", value: scenarioNames },
   ]);
 
   Empirica.flush();
@@ -371,15 +407,9 @@ function sweepLobbyPresence(ctx) {
     for (const p of players) {
       if (p.get("gameID") !== game.id) continue;
       if (waitingPlayers[p.id] || !isPresent(p)) continue;
-      const groupName = p.get("groupName") || "default";
-      waitingPlayers[p.id] = {
-        id: p.id,
-        displayName: p.get("displayName") || "Anonymous",
-        groupName,
-        joinedAt: p.get("lobbyJoinedAt") ?? now,
-      };
+      waitingPlayers[p.id] = waitingPlayerEntry(p, p.get("lobbyJoinedAt") ?? now);
       changed = true;
-      console.log(`[PRESENCE] Re-added ${p.id} to waiting game ${game.id} (group "${groupName}")`);
+      console.log(`[PRESENCE] Re-added ${p.id} to waiting game ${game.id} (group "${waitingPlayers[p.id].displayGroupName}")`);
     }
 
     // Prune players who are no longer assigned here or who have gone absent.
@@ -387,7 +417,7 @@ function sweepLobbyPresence(ctx) {
       const playerScope = playerById.get(playerId);
       const stillAssigned = playerScope && playerScope.get("gameID") === game.id;
       if (stillAssigned && isPresent(playerScope)) continue;
-      const groupName = info.groupName || "default";
+      const groupName = info.groupName || NO_GROUP_NAME;
       delete waitingPlayers[playerId];
       changed = true;
       console.log(`[PRESENCE] Pruned ${playerId} from waiting game ${game.id} (group "${groupName}")`);
@@ -401,6 +431,33 @@ function sweepLobbyPresence(ctx) {
   if (waitingGames.length > 0) Empirica.flush();
 }
 
+// The functional lobby identity: two players share a lobby only if they share
+// BOTH the group name and the scenario, so "teamA" on the_vacation and "teamA"
+// on shared_office never see each other or start together. NUL-separated so a
+// group name cannot contain the separator and forge another group's identity.
+// Never displayed: the lobby renders the raw name plus the scenario's title.
+// `player.get("groupName")` itself stays the raw human name — the club rebuilds
+// a participant's key from it (client/src/Stage.jsx).
+function lobbyGroupName(groupName, scenario) {
+  return `${groupName || NO_GROUP_NAME}\u0000${scenario || ""}`;
+}
+
+// One player's entry in a waiting game's `waitingPlayers` roster. `groupName` is
+// the composite the lobby matches on; `displayGroupName` is the raw name, kept
+// for logging and any future UI.
+function waitingPlayerEntry(player, joinedAt) {
+  const rawGroupName = player.get("groupName") || NO_GROUP_NAME;
+  const scenario = player.get("scenario") || "";
+  return {
+    id: player.id,
+    displayName: player.get("displayName") || "Anonymous",
+    groupName: lobbyGroupName(rawGroupName, scenario),
+    displayGroupName: rawGroupName,
+    scenario,
+    joinedAt,
+  };
+}
+
 // Group players by groupName AND scenario. A game must be single-scenario:
 // createAndAssignGame takes the scenario from players[0] and applies it to the
 // whole game, so a mixed-scenario bucket here would hand some players a briefing
@@ -409,9 +466,9 @@ function sweepLobbyPresence(ctx) {
 function groupByGroupAndScenario(players) {
   const groups = {};
   for (const player of players) {
-    const groupName = player.get("groupName") || "default";
+    const groupName = player.get("groupName") || NO_GROUP_NAME;
     const scenario = player.get("scenario") || "";
-    const key = `${groupName}\u0000${scenario}`;
+    const key = lobbyGroupName(groupName, scenario);
     if (!groups[key]) {
       groups[key] = { groupName, scenario, players: [] };
     }
@@ -686,10 +743,23 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
     return;
   }
 
+  // The client sends the composite lobby identity (group name + scenario); it is
+  // what the roster is keyed on, so it is what we match against below. The raw
+  // name is only for logging and for the game record.
   const groupName = requestStart.groupName;
+  const rawGroupName = player.get("groupName") || NO_GROUP_NAME;
   const requestingPlayerId = player.id;
 
-  console.log(`[PLAYER] Start requested for group "${groupName}" by player ${requestingPlayerId}`);
+  console.log(`[PLAYER] Start requested for group "${rawGroupName}" (scenario "${player.get("scenario") || ""}") by player ${requestingPlayerId}`);
+
+  // The client refuses to render a lobby for a player with no group name, so
+  // this should be unreachable — but a start is destructive and cheap to guard.
+  if (rawGroupName === NO_GROUP_NAME) {
+    console.error(`[PLAYER] Player ${requestingPlayerId} requested start with no group name — ignoring`);
+    player.set("requestStart", null);
+    Empirica.flush();
+    return;
+  }
   console.log(`[DIAG][requestStart] received`, {
     requestingPlayerId,
     requestStart,
@@ -720,7 +790,8 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
 
   // Starting is not gated on any per-group role — any group member may start.
   console.log(`[DIAG][requestStart] start requested`, {
-    groupName,
+    groupName: rawGroupName,
+    scenario: player.get("scenario"),
     requestingPlayerId,
     rosterIds: Object.keys(game.get("waitingPlayers") || {}),
   });
@@ -730,7 +801,7 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
   const groupMembers = Object.values(waitingPlayers).filter(p => p.groupName === groupName);
 
   if (groupMembers.length === 0) {
-    console.log(`[PLAYER] No players in group "${groupName}"`);
+    console.log(`[PLAYER] No players in group "${rawGroupName}"`);
     player.set("requestStart", null);
     Empirica.flush();
     return;
@@ -744,7 +815,7 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
     return;
   }
 
-  console.log(`[PLAYER] Starting game for group "${groupName}" with ${groupMembers.length} players`);
+  console.log(`[PLAYER] Starting game for group "${rawGroupName}" with ${groupMembers.length} players`);
 
   // Get the batch
   const batch = Array.from(ctx.scopesByKind("batch").values())
@@ -866,7 +937,7 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
   // so the lock only needs to cover game creation.
   const startKey = `${game.id}:${groupName}`;
   if (startInFlight.has(startKey)) {
-    console.log(`[PLAYER] Start already in progress for group "${groupName}", ignoring`);
+    console.log(`[PLAYER] Start already in progress for group "${rawGroupName}", ignoring`);
     player.set("requestStart", null);
     Empirica.flush();
     return;
@@ -875,7 +946,9 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
 
   try {
     for (const chunkPlayers of chunks) {
-      await createAndAssignGame(ctx, batch, chunkPlayers, groupName);
+      // Raw name, not the composite: the game's stored `groupName` and the
+      // [ASSIGNMENT] logs stay human-readable.
+      await createAndAssignGame(ctx, batch, chunkPlayers, rawGroupName);
     }
 
     // Remove assigned players from waitingPlayers; leftovers stay. Re-read the
@@ -895,7 +968,7 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
     }
 
     Empirica.flush();
-    console.log(`[PLAYER] Game creation complete for group "${groupName}"`);
+    console.log(`[PLAYER] Game creation complete for group "${rawGroupName}"`);
   } finally {
     startInFlight.delete(startKey);
   }
@@ -1038,6 +1111,13 @@ function validateScenario(ctx, batch, player) {
     if (sizes[scenario] !== info.size) {
       game.set("scenarioSizes", { ...sizes, [scenario]: info.size });
     }
+    // Fall back to the slug when the role JSON carries no `name`: an ugly label
+    // still tells two same-named lobbies apart, an empty one does not.
+    const names = game.get("scenarioNames") || {};
+    const title = info.name || scenario;
+    if (names[scenario] !== title) {
+      game.set("scenarioNames", { ...names, [scenario]: title });
+    }
   }
 }
 
@@ -1109,17 +1189,15 @@ async function assignToWaitingGame(ctx, player) {
   // Store player info on the waiting game for client-side visibility
   // (usePlayers() doesn't work reliably in lobby context)
   const waitingPlayers = waitingGame.get("waitingPlayers") || {};
-  const playerGroupName = player.get("groupName") || "default";
   const joinedAt = Date.now();
   // Stable join time on the player scope: survives roster pruning so the lobby
   // sweep can grant a consistent new-joiner grace and re-add the player.
   player.set("lobbyJoinedAt", joinedAt);
-  waitingPlayers[player.id] = {
-    id: player.id,
-    displayName: player.get("displayName") || "Anonymous",
-    groupName: playerGroupName,
-    joinedAt,
-  };
+  // groupName and scenario are both still unset at this point — the client can
+  // only write them after assignment — so this entry is provisional. The
+  // groupName/scenario listeners rewrite it as each value arrives.
+  waitingPlayers[player.id] = waitingPlayerEntry(player, joinedAt);
+  const playerGroupName = waitingPlayers[player.id].displayGroupName;
   waitingGame.set("waitingPlayers", waitingPlayers);
 
   Empirica.flush();
@@ -1193,9 +1271,36 @@ Empirica.on("player", async (ctx, { player }) => {
   await assignToWaitingGame(ctx, player);
 });
 
+// Rewrite a player's roster entry from their current attributes.
+//
+// A player is assigned to the waiting game on connect, before the client has had
+// a chance to write `groupName` or `scenario` (Empirica offers the browser no
+// hook to set an attribute before assignment — see assignToWaitingGame). So the
+// entry written there is provisional, and every attribute the lobby identity
+// depends on must call this when it lands. Since the identity is now
+// (groupName, scenario), that means BOTH of those, not just groupName.
+function refreshWaitingPlayerEntry(ctx, player, reason) {
+  const gameId = player.get("gameID");
+  if (!gameId) return;
+
+  const game = Array.from(ctx.scopesByKind("game").values()).find(g => g.id === gameId);
+  if (!game || !game.get("isWaiting")) return;
+
+  const waitingPlayers = game.get("waitingPlayers") || {};
+  const existing = waitingPlayers[player.id];
+  // Not in the roster yet — assignToWaitingGame will add them with current values.
+  if (!existing) return;
+
+  waitingPlayers[player.id] = waitingPlayerEntry(player, existing.joinedAt);
+  game.set("waitingPlayers", waitingPlayers);
+  Empirica.flush();
+  console.log(`[PLAYER] Refreshed roster entry for ${player.id} (${reason}): group "${waitingPlayers[player.id].displayGroupName}", scenario "${waitingPlayers[player.id].scenario}"`);
+}
+
 // When a player's scenario arrives/changes (set during intro), (re)validate it so
-// the lobby can flag a missing/unknown scenario. The scenario is applied to the real
-// game at creation time, not here — so no (re)assignment is needed.
+// the lobby can flag a missing/unknown scenario, and refresh their roster entry —
+// the scenario is half of the lobby identity, so until this runs the player sits
+// in a lobby keyed on an empty scenario and cannot see their own group.
 Empirica.on("player", "scenario", async (ctx, { player }) => {
   console.log(`[PLAYER] Player ${player.id} set scenario to: ${player.get("scenario")}`);
   // Validate against the running batch directly. Do NOT gate on gameID: with a fast
@@ -1210,55 +1315,20 @@ Empirica.on("player", "scenario", async (ctx, { player }) => {
     validateScenario(ctx, batch, player);
     Empirica.flush();
   }
+
+  refreshWaitingPlayerEntry(ctx, player, "scenario");
 });
 
 // Listen for groupName changes and update waitingPlayers on the game
 Empirica.on("player", "groupName", async (ctx, { player }) => {
-  const newGroupName = player.get("groupName") || "default";
-  console.log(`[PLAYER] Player ${player.id} set groupName to: ${newGroupName}`);
-
-  // Update waitingPlayers on the game so client can see the change
-  const gameId = player.get("gameID");
-  if (gameId) {
-    const game = Array.from(ctx.scopesByKind("game").values())
-      .find(g => g.id === gameId);
-
-    if (game && game.get("isWaiting")) {
-      const waitingPlayers = game.get("waitingPlayers") || {};
-
-      if (waitingPlayers[player.id]) {
-        waitingPlayers[player.id].groupName = newGroupName;
-        waitingPlayers[player.id].displayName = player.get("displayName") || "Anonymous";
-        game.set("waitingPlayers", waitingPlayers);
-      }
-
-      Empirica.flush();
-      console.log(`[PLAYER] Updated waitingPlayers for player ${player.id} with groupName: ${newGroupName}`);
-    }
-  }
+  console.log(`[PLAYER] Player ${player.id} set groupName to: ${player.get("groupName") || NO_GROUP_NAME}`);
+  refreshWaitingPlayerEntry(ctx, player, "groupName");
 });
 
 // Listen for displayName changes and update waitingPlayers on the game
 Empirica.on("player", "displayName", async (ctx, { player }) => {
-  const displayName = player.get("displayName");
-  console.log(`[PLAYER] Player ${player.id} set displayName to: ${displayName}`);
-
-  // Update waitingPlayers on the game so client can see the change
-  const gameId = player.get("gameID");
-  if (gameId) {
-    const game = Array.from(ctx.scopesByKind("game").values())
-      .find(g => g.id === gameId);
-
-    if (game && game.get("isWaiting")) {
-      const waitingPlayers = game.get("waitingPlayers") || {};
-      if (waitingPlayers[player.id]) {
-        waitingPlayers[player.id].displayName = displayName || "Anonymous";
-        game.set("waitingPlayers", waitingPlayers);
-        Empirica.flush();
-        console.log(`[PLAYER] Updated waitingPlayers for player ${player.id} with displayName: ${displayName}`);
-      }
-    }
-  }
+  console.log(`[PLAYER] Player ${player.id} set displayName to: ${player.get("displayName")}`);
+  refreshWaitingPlayerEntry(ctx, player, "displayName");
 });
 
 // When player completes intro, mark them ready
@@ -1477,73 +1547,33 @@ function setupGameOnStart(game) {
     try {
       const roomExp = Math.round(Date.now() / 1000) + 60 * 60 * 4; // 4 hour expiry
 
-      // Create the Daily room
-      const res = await fetch("https://api.daily.co/v1/rooms", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${DAILY_API_KEY}`,
-          "Content-Type": "application/json",
+      // Create the Daily room. dailyRequest retries transient failures, so a
+      // brief Daily blip no longer costs this negotiation its video for good.
+      const res = await dailyRequest(`create game room ${roomName}`, "rooms", {
+        name: roomName,
+        properties: {
+          exp: roomExp,
+          enable_recording: "raw-tracks",
+          enable_transcription_storage: true,
         },
-        body: JSON.stringify({
-          name: roomName,
-          properties: {
-            exp: roomExp,
-            enable_recording: "raw-tracks",
-            enable_transcription_storage: true,
-          },
-        }),
       });
 
-      const data = await res.json();
-
-      if (!data.url) {
-        console.error("Failed to create Daily room:", data);
+      if (!res.ok || !res.data?.url) {
         return;
       }
 
       // Save the room URL to the game
-      game.set("roomUrl", data.url);
+      game.set("roomUrl", res.data.url);
       Empirica.flush();
-      console.log(`Room created for game: ${data.url}`);
+      console.log(`Room created for game: ${res.data.url}`);
 
       console.log("Creating meeting tokens for players");
-      // Create meeting tokens for each player with transcription permissions
+      // Same token creation as the waiting room uses, so it gets the same retry.
       const tokenPromises = game.players.map(async (player) => {
-        try {
-          const displayName = player.get("displayName") 
-          const user_name = player.get("displayName")  + " - " + `Player ${player.id}`;
-
-          const tokenRes = await fetch("https://api.daily.co/v1/meeting-tokens", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${DAILY_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              properties: {
-                room_name: roomName,
-                user_name: user_name,
-                user_id: player.id,
-                is_owner: false,
-                permissions: {
-                  canAdmin: ["transcription"]
-                },
-                exp: roomExp,
-              },
-            }),
-          });
-
-          const tokenData = await tokenRes.json();
-
-          if (tokenData.token) {
-            player.set("dailyMeetingToken", tokenData.token);
-            Empirica.flush();
-            console.log(`Created token for player ${displayName}`);
-          } else {
-            console.error(`Failed to create token for player ${displayName}:`, tokenData);
-          }
-        } catch (err) {
-          console.error(`Error creating token for player ${player.id}:`, err);
+        const token = await createMeetingToken(roomName, player, roomExp);
+        if (token) {
+          player.set("dailyMeetingToken", token);
+          Empirica.flush();
         }
       });
 

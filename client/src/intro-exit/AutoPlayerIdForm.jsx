@@ -6,7 +6,10 @@ export function AutoPlayerIdForm({ onPlayerID }) {
     const urlParams = new URLSearchParams(window.location.search);
     const paramsObj = Object.fromEntries(urlParams?.entries());
     const playerIdFromUrl = paramsObj?.participantKey || "undefined";
-    const groupNameFromUrl = paramsObj?.groupName || "default";
+    // Sentinel, not "default" — see NO_GROUP_NAME in CustomLobby.jsx. Writing it
+    // explicitly (rather than leaving groupName unset) lets the server tell
+    // "no group name supplied" apart from "not written yet".
+    const groupNameFromUrl = paramsObj?.groupName || "null061486";
     // Scenario routing key (e.g. ?scenario=price_example). The server uses this
     // to route the player to the matching batch's waiting room. Empty if absent.
     const scenarioFromUrl = paramsObj?.scenario || "";

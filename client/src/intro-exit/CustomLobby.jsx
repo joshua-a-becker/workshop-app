@@ -138,6 +138,62 @@ function PlayerChip({ player, selected, onClick, onDragStart, onDragEnd }) {
 // scenario as invalid. Rendered instead of the lobby — these players are never
 // assigned to a game, so they never reach the exit steps. Also reused by Game
 // for role-data failures that surface after the lobby, at game start.
+// Stands in for "no group name was supplied". Deliberately not "default": that
+// is a name a participant may legitimately type, and the two must stay
+// distinguishable — an absent name means an incomplete link and is refused
+// below, a chosen one is honoured. Must match NO_GROUP_NAME in
+// server/src/callbacks.js.
+const NO_GROUP_NAME = "null061486";
+
+// Must match lobbyGroupName() in server/src/callbacks.js exactly — the server
+// keys every waiting-room roster entry on this string.
+function lobbyGroupName(groupName, scenario) {
+  return `${groupName || NO_GROUP_NAME}\u0000${scenario || ""}`;
+}
+
+// Where this player believes they belong. Both values arrive as URL params and a
+// player cannot get in without them, but the player attributes are written
+// asynchronously after connect — so we read the URL, which is there on first
+// render, and prefer the player attributes once they land (they are what the
+// server keys the roster on, so preferring them is what makes the two converge).
+function useLobbyIdentity() {
+  const player = usePlayer();
+  const { groupName: contextGroupName } = useContext(DailyCallContext);
+  const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
+
+  const displayGroupName =
+    player?.get("groupName") || urlParams.get("groupName") || contextGroupName || NO_GROUP_NAME;
+  const scenario = player?.get("scenario") || urlParams.get("scenario") || "";
+
+  return { displayGroupName, scenario, groupKey: lobbyGroupName(displayGroupName, scenario) };
+}
+
+// Shown while the server's view of this player has not yet caught up with ours.
+// Normally a fraction of a second; the hint appears if it drags, so a genuinely
+// broken link reads as a problem rather than as a hang.
+function LobbyLoadingPanel() {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 15000);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div className="h-screen w-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 text-center">
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Joining your group…</h2>
+        <p className="text-gray-600">One moment.</p>
+        {slow && (
+          <p className="text-sm text-gray-500 mt-4">
+            This is taking longer than usual. If it doesn't clear, your session link may be
+            incomplete — please use the link provided for your session.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ScenarioErrorPanel({ message }) {
   return (
     <div className="h-screen w-screen bg-gray-100 flex items-center justify-center p-4">
@@ -159,12 +215,39 @@ export function ScenarioErrorPanel({ message }) {
 // usePlayer), so the Rules of Hooks are respected across renders.
 export function CustomLobby() {
   const player = usePlayer();
+  const game = useGame();
+  const { displayGroupName, groupKey } = useLobbyIdentity();
+
   // The server validates the scenario by fetching its role JSON from the club
   // and sets `scenarioError` when it's missing/unknown.
   const scenarioError = player?.get("scenarioError");
 
   if (scenarioError) {
     return <ScenarioErrorPanel message={scenarioError} />;
+  }
+
+  // No group name in the link. Unlike a pending state this never resolves, so it
+  // is an error rather than a wait. "default" is not used as the stand-in
+  // precisely so that a participant who deliberately types "default" is let
+  // through here.
+  if (displayGroupName === NO_GROUP_NAME) {
+    return (
+      <ScenarioErrorPanel message="No group name was specified in your link. Please use the link provided for your session." />
+    );
+  }
+
+  // Don't render a lobby until the server agrees which lobby we are in.
+  //
+  // Our roster entry is written on connect, before the client has had a chance
+  // to send groupName and scenario, and is rewritten as each arrives. Rendering
+  // during that window shows the server's stale view: our own group appears
+  // empty because nobody's entry has converged yet, and a Start pressed then
+  // would leave the un-converged players behind. Waiting makes the invariant
+  // simple — if you can see the lobby, the server and you agree on your group
+  // and scenario, and so does everyone you can see.
+  const myEntry = game?.get("waitingPlayers")?.[player?.id];
+  if (!myEntry || myEntry.groupName !== groupKey) {
+    return <LobbyLoadingPanel />;
   }
 
   return <CustomLobbyInner />;
@@ -174,10 +257,15 @@ function CustomLobbyInner() {
   const player = usePlayer();
   const game = useGame();
 
-  const { groupName: contextGroupName } = useContext(DailyCallContext);
-
-  // Get player's groupName (from URL params set on player, or from context)
-  const myGroupName = player?.get("groupName") || contextGroupName || "default";
+  // The functional lobby identity: group name AND scenario, so two people who
+  // typed the same group name but opened different scenario links are in
+  // different lobbies. The wrapper above has already confirmed the server's
+  // roster agrees with this before rendering us.
+  const {
+    displayGroupName: myDisplayGroupName,
+    scenario: myScenario,
+    groupKey: myGroupName,
+  } = useLobbyIdentity();
 
   // Get waitingPlayers from game (stored by server since usePlayers() doesn't work in lobby)
   const waitingPlayersObj = game?.get("waitingPlayers") || {};
@@ -186,7 +274,7 @@ function CustomLobbyInner() {
   const groupMembers = useMemo(() => {
     const members = [];
     for (const [playerId, playerInfo] of Object.entries(waitingPlayersObj)) {
-      const theirGroupName = playerInfo.groupName || "default";
+      const theirGroupName = playerInfo.groupName;
       const isInMyGroup = theirGroupName === myGroupName;
       const isNotMe = playerId !== player?.id;
 
@@ -205,8 +293,9 @@ function CustomLobbyInner() {
   // Real per-game size, surfaced by the server on the waiting game so the
   // lobby can preview how the group would be split. In a multi-treatment batch
   // the size depends on the player's scenario, so prefer the per-scenario value.
-  const myScenario = player?.get("scenario");
   const scenarioSizes = game?.get("scenarioSizes") || {};
+  const scenarioNames = game?.get("scenarioNames") || {};
+  const scenarioTitle = scenarioNames[myScenario] || myScenario;
   const gamePlayerCount = scenarioSizes[myScenario] || game?.get("gamePlayerCount") || 4;
 
   // Create a Set of player IDs for video filtering
@@ -324,8 +413,15 @@ function CustomLobbyInner() {
             <Users className="w-10 h-10 text-blue-500" strokeWidth={1.5} />
           </div>
           <h1 className="text-xl font-semibold text-gray-900 mb-1">
-            {myGroupName}
+            {myDisplayGroupName}
           </h1>
+          {/* Two lobbies can share a group name and differ only by scenario, so
+              name the scenario. `scenarioNames` is the role JSON's own title
+              (e.g. "The Vacation"), resolved server-side; it falls back to the
+              slug if that scenario's role data carries no name. */}
+          {scenarioTitle && (
+            <p className="text-sm text-gray-500">{scenarioTitle}</p>
+          )}
         </div>
 
         {/* Start button — available to every group member */}
