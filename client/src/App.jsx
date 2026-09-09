@@ -1152,10 +1152,11 @@ export default function App() {
     isVideoEnabled,
     setIsVideoEnabled,
     setIsVideoChatMounted,
+    mediaLocked,
     setMediaLocked,
     teardownCall,
     groupName, // Include groupName for child components
-  }), [mediaStream, callState, registerCallData, refreshRemoteParticipant, teardownCall, isAudioEnabled, isVideoEnabled, groupName]);
+  }), [mediaStream, callState, registerCallData, refreshRemoteParticipant, teardownCall, isAudioEnabled, isVideoEnabled, mediaLocked, groupName]);
 
   // ============================================================================
   // CONDITIONAL RENDERING (no early returns to preserve hook order)

@@ -5,3 +5,6 @@ dist
 /data_download
 *.vtt
 *.recording
+
+# Local-only secrets (see src/secrets.example.js)
+src/secrets.js

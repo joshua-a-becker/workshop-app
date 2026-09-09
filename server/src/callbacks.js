@@ -1,19 +1,31 @@
 import { ClassicListenersCollector } from "@empirica/core/admin/classic";
 import fetch from "node-fetch";
 import { execSync } from "child_process";
+import { randomUUID } from "crypto";
 import fs from "fs";
+import { DAILY_API_KEY } from "./secrets.js";
 
 // import rolesData from "./roles.json" assert { type: "json" };
 // const roles = rolesData.roles;
 
 export const Empirica = new ClassicListenersCollector();
 
-// Daily.co API key for creating rooms and tokens
-const DAILY_API_KEY = "d9ff4a046f2a0c3571efa7655fbf80907ad2ffd4d7c89cae0a89e89424d63642";
-
 // Store context reference for polling and assignment
 let globalCtx = null;
 let pollingStarted = false;
+
+// Concurrency guards. Both listeners below are async, so these must be readable
+// without a flush round-trip (a game/batch attribute would not be) and must not
+// survive a restart.
+//
+// Any group member may press Start (see the requestStart listener), so two
+// clicks can race and create two games for the same people. Keyed by
+// `${waitingGameId}:${groupName}`.
+const startInFlight = new Set();
+// The "batch" and "batch"/"status" listeners both call createWaitingGame, whose
+// existence check is separated from addGame by an await. Keyed by batch id, and
+// holding the promise so a second caller shares the first one's result.
+const waitingGameInFlight = new Map();
 
 // Configuration
 const ASSIGNMENT_TIMEZONE = "America/New_York";
@@ -224,7 +236,24 @@ function getTargetPlayerCount(ctx, batch) {
 }
 
 // Helper function to create waiting game with Daily.co room
-async function createWaitingGame(ctx, batch) {
+// Serialize per batch and share the one result. Without this, the two batch
+// listeners can both pass the "already exists" check inside — it is separated
+// from addGame by an await for the Daily room — and create two waiting games for
+// one batch, splitting players across two lobbies where they cannot see or start
+// with each other.
+function createWaitingGame(ctx, batch) {
+  const inFlight = waitingGameInFlight.get(batch.id);
+  if (inFlight) {
+    console.log(`[BATCH] Waiting game creation already in progress for batch ${batch.id}, awaiting it`);
+    return inFlight;
+  }
+
+  const promise = doCreateWaitingGame(ctx, batch);
+  waitingGameInFlight.set(batch.id, promise);
+  return promise.finally(() => waitingGameInFlight.delete(batch.id));
+}
+
+async function doCreateWaitingGame(ctx, batch) {
   const games = Array.from(ctx.scopesByKind("game").values());
   const existingWaitingGame = games.find(g =>
     g.get("batchID") === batch.id &&
@@ -372,15 +401,21 @@ function sweepLobbyPresence(ctx) {
   if (waitingGames.length > 0) Empirica.flush();
 }
 
-// Group players by groupName
-function groupByGroupName(players) {
+// Group players by groupName AND scenario. A game must be single-scenario:
+// createAndAssignGame takes the scenario from players[0] and applies it to the
+// whole game, so a mixed-scenario bucket here would hand some players a briefing
+// for a negotiation they did not join. The requestStart path already filters the
+// same way (see `sameScenario` there).
+function groupByGroupAndScenario(players) {
   const groups = {};
   for (const player of players) {
     const groupName = player.get("groupName") || "default";
-    if (!groups[groupName]) {
-      groups[groupName] = [];
+    const scenario = player.get("scenario") || "";
+    const key = `${groupName}\u0000${scenario}`;
+    if (!groups[key]) {
+      groups[key] = { groupName, scenario, players: [] };
     }
-    groups[groupName].push(player);
+    groups[key].players.push(player);
   }
   return groups;
 }
@@ -423,14 +458,15 @@ async function assignPlayersToGames(ctx) {
 
   console.log(`[ASSIGNMENT] Small group mode: ${smallGroupMode}, playerCount: ${playerCount}`);
 
-  // Group players by groupName
-  const groups = groupByGroupName(waitingPlayers);
-  console.log(`[ASSIGNMENT] Found ${Object.keys(groups).length} groups:`, Object.keys(groups).map(k => `${k}(${groups[k].length})`));
+  // Group players by groupName and scenario
+  const groups = groupByGroupAndScenario(waitingPlayers);
+  console.log(`[ASSIGNMENT] Found ${Object.keys(groups).length} groups:`, Object.values(groups).map(g => `${g.groupName}/${g.scenario}(${g.players.length})`));
 
   // Process each group
   const processedPlayers = new Set();
 
-  for (const [groupName, members] of Object.entries(groups)) {
+  for (const [groupKey, group] of Object.entries(groups)) {
+    const { groupName, scenario, players: members } = group;
     // Skip already processed players
     const unprocessed = members.filter(p => !processedPlayers.has(p.id));
 
@@ -456,7 +492,7 @@ async function assignPlayersToGames(ctx) {
     } else if (smallGroupMode === "oversize") {
       // Pull extra players from other groups
       const needed = playerCount - unprocessed.length;
-      const extras = findExtraPlayers(groups, needed, groupName, processedPlayers);
+      const extras = findExtraPlayers(groups, needed, groupKey, processedPlayers, scenario);
       const toAssign = [...unprocessed, ...extras];
 
       if (toAssign.length > 0) {
@@ -471,13 +507,15 @@ async function assignPlayersToGames(ctx) {
 }
 
 // Find extra players from other groups to fill a game
-function findExtraPlayers(groups, needed, excludeGroup, processedPlayers) {
+function findExtraPlayers(groups, needed, excludeKey, processedPlayers, scenario) {
   const extras = [];
 
-  for (const [groupName, members] of Object.entries(groups)) {
-    if (groupName === excludeGroup) continue;
+  for (const [key, group] of Object.entries(groups)) {
+    if (key === excludeKey) continue;
+    // Oversize pulls players from other groups, but never across scenarios.
+    if (group.scenario !== scenario) continue;
 
-    for (const player of members) {
+    for (const player of group.players) {
       if (!processedPlayers.has(player.id) && extras.length < needed) {
         extras.push(player);
       }
@@ -507,12 +545,36 @@ async function createAndAssignGame(ctx, batch, players, groupName) {
     Empirica.flush();
     return;
   }
+
+  // A game is single-scenario: roleDataURL below is derived from this one
+  // scenario and applies to everyone in the game. Callers are expected to have
+  // grouped by scenario already; if one slips through, start only the matching
+  // subset rather than silently handing the others a briefing for a negotiation
+  // they did not join.
+  const mismatched = players.filter(p => p.get("scenario") !== scenario);
+  if (mismatched.length > 0) {
+    console.error(
+      `[ASSIGNMENT] Group "${groupName}" mixes scenarios — starting only "${scenario}", excluding ${mismatched.length} player(s):`,
+      mismatched.map(p => p.id)
+    );
+    for (const p of mismatched) {
+      p.set("scenarioError", `Could not start your negotiation: your group mixed scenarios. Please use the link provided for your session.`);
+    }
+    Empirica.flush();
+    players = players.filter(p => p.get("scenario") === scenario);
+    if (players.length < 2) {
+      console.error(`[ASSIGNMENT] Only ${players.length} player(s) share scenario "${scenario}" — aborting game for group "${groupName}"`);
+      return;
+    }
+  }
+
   const roleDataURL = roleDataUrlFor(scenario);
 
-  // Snapshot existing game IDs so we can identify the newly created one
-  const existingGameIds = new Set(
-    Array.from(ctx.scopesByKind("game").values()).map(g => g.id)
-  );
+  // Tag the game we are about to create so we can find it unambiguously below.
+  // Matching on groupName alone is not enough: one requestStart can create
+  // several games for the same group (one per chunk), so a groupName match can
+  // resolve to a sibling chunk's game instead of ours.
+  const createToken = randomUUID();
 
   // batch.addGame() returns a lightweight {get, set} proxy, NOT a full Game
   // instance — it lacks assignPlayer, id, etc. We create the game, then look
@@ -531,6 +593,7 @@ async function createAndAssignGame(ctx, batch, players, groupName) {
     { key: "scenario", value: scenario },
     { key: "roleDataURL", value: roleDataURL },
     { key: "isWaiting", value: false },
+    { key: "createToken", value: createToken },
   ]);
 
   Empirica.flush();
@@ -539,10 +602,7 @@ async function createAndAssignGame(ctx, batch, players, groupName) {
   let game = null;
   for (let attempt = 0; attempt < 50; attempt++) {
     const allGames = Array.from(ctx.scopesByKind("game").values());
-    game = allGames.find(g =>
-      !existingGameIds.has(g.id) &&
-      g.get("groupName") === groupName
-    );
+    game = allGames.find(g => g.get("createToken") === createToken);
     if (game) break;
     await new Promise(resolve => setTimeout(resolve, 100));
   }
@@ -570,8 +630,9 @@ async function createAndAssignGame(ctx, batch, players, groupName) {
     console.log(`[ASSIGNMENT] Assigned player ${player.id} (${player.get("displayName")}) to game ${game.id}`);
   }
 
-  // Start the game
-  game.set("start", true);
+  // Start the game. Game.start() is idempotent (it no-ops if `start` is already
+  // set) and also records actualPlayerCount, which a raw set("start", true) skips.
+  game.start();
   Empirica.flush();
 
   console.log(`[ASSIGNMENT] Game ${game.id} started with ${players.length} players`);
@@ -797,24 +858,47 @@ Empirica.on("player", "requestStart", async (ctx, { player }) => {
     (leftovers.length > 0 ? `, ${leftovers.length} stay in lobby (${leftovers.map(p => p.id).join(", ")})` : "")
   );
 
-  for (const chunkPlayers of chunks) {
-    await createAndAssignGame(ctx, batch, chunkPlayers, groupName);
+  // Starting is not gated on any per-group role, so two members can press Start
+  // at once. Both would reach here off the same `waitingPlayers` snapshot, chunk
+  // it identically, and create a second set of games for the same people —
+  // assignPlayer would move everyone to the later games, leaving the earlier
+  // ones started with an empty roster. Everything above this point is read-only,
+  // so the lock only needs to cover game creation.
+  const startKey = `${game.id}:${groupName}`;
+  if (startInFlight.has(startKey)) {
+    console.log(`[PLAYER] Start already in progress for group "${groupName}", ignoring`);
+    player.set("requestStart", null);
+    Empirica.flush();
+    return;
   }
+  startInFlight.add(startKey);
 
-  // Remove assigned players from waitingPlayers; leftovers stay.
-  const assignedIds = new Set(chunks.flat().map(p => p.id));
-  for (const pid of assignedIds) {
-    delete waitingPlayers[pid];
+  try {
+    for (const chunkPlayers of chunks) {
+      await createAndAssignGame(ctx, batch, chunkPlayers, groupName);
+    }
+
+    // Remove assigned players from waitingPlayers; leftovers stay. Re-read the
+    // roster rather than reusing the snapshot taken before the awaits above: the
+    // presence sweep and newly-joining players write this same object while games
+    // are being created, and reusing the stale copy would discard their edits.
+    const assignedIds = new Set(chunks.flat().map(p => p.id));
+    const latestWaitingPlayers = { ...(game.get("waitingPlayers") || {}) };
+    for (const pid of assignedIds) {
+      delete latestWaitingPlayers[pid];
+    }
+    game.set("waitingPlayers", latestWaitingPlayers);
+
+    // Clear requestStart for every involved player (assigned and leftovers).
+    for (const p of playersToAssign) {
+      p.set("requestStart", null);
+    }
+
+    Empirica.flush();
+    console.log(`[PLAYER] Game creation complete for group "${groupName}"`);
+  } finally {
+    startInFlight.delete(startKey);
   }
-  game.set("waitingPlayers", waitingPlayers);
-
-  // Clear requestStart for every involved player (assigned and leftovers).
-  for (const p of playersToAssign) {
-    p.set("requestStart", null);
-  }
-
-  Empirica.flush();
-  console.log(`[PLAYER] Game creation complete for group "${groupName}"`);
 });
 
 // Three assignment strategies for splitting a lobby group into games.
@@ -1294,6 +1378,38 @@ Empirica.onStageEnded(({ stage }) => {
 });
 
 Empirica.onGameStart(({ game }) => {
+  // Empirica's own de-duplication (the `unique()` wrapper behind onGameStart)
+  // records that it ran only AFTER this callback returns, so its guard window is
+  // exactly as wide as our runtime — and setupGameOnStart blocks on a role fetch.
+  // A second delivery of the same `start` attribute lands inside that window and
+  // re-runs the whole setup: a second Daily room ("room already exists"), a fresh
+  // random role draw overwriting the first, and a duplicate set of rounds and
+  // stages. Close the window ourselves, synchronously, before any I/O —
+  // Attribute.set() updates the local value immediately, so a second delivery
+  // reads this back with no server round-trip.
+  if (game.get("setupStarted")) {
+    console.log(`[GAME START] Game ${game.id} already set up, ignoring duplicate start`);
+    return;
+  }
+  game.set("setupStarted", true);
+
+  try {
+    setupGameOnStart(game);
+  } catch (err) {
+    // The guard above is deliberately NOT released here: re-running setup is
+    // what produces duplicate rounds, and fetchRoleData caches failures for
+    // ROLE_DATA_ERROR_TTL_MS anyway, so an immediate retry would fail the same
+    // way. Surface it instead of leaving players in a game with no stages.
+    console.error(`[GAME START] Game ${game.id} setup failed:`, err);
+    (game.players || []).forEach(p => p.set("scenarioError", "Something went wrong setting up your negotiation. Please contact your session host."));
+    Empirica.flush();
+  }
+});
+
+// Full game setup: role data, Daily room, role assignment, rounds and stages.
+// Split out of the listener above so that listener stays small enough to carry
+// the duplicate-start guard and the failure path.
+function setupGameOnStart(game) {
 
   const treatment = game.get("treatment");
   // Set at game creation from the players' ?scenario= and this deployment's CLUB_BASE.
@@ -1355,7 +1471,6 @@ Empirica.onGameStart(({ game }) => {
   (async () => {
     const d = new Date();
     const today = `${d.getFullYear()}_${String(d.getMonth()+1).padStart(2,'0')}_${String(d.getDate()).padStart(2,'0')}`;
-    const DAILY_API_KEY = "d9ff4a046f2a0c3571efa7655fbf80907ad2ffd4d7c89cae0a89e89424d63642";
     const roomName = `${game.id}_video_room_${today}`;
 
     console.log("Creating Daily.co room for game:", game.id);
@@ -1525,7 +1640,7 @@ Empirica.onGameStart(({ game }) => {
 
   console.log("game started?")
 
-});
+}
 
 // NOTE: there is deliberately no onStageStart presence monitor. It polled Daily's
 // presence API every 5s per stage to maintain `participantTimestamps`,

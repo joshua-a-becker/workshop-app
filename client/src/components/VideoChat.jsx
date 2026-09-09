@@ -281,6 +281,7 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null }) {
     isVideoEnabled,
     setIsVideoEnabled,
     setIsVideoChatMounted,
+    mediaLocked,
   } = useContext(DailyCallContext);
 
   const roomUrl = game?.get("roomUrl");
@@ -615,8 +616,12 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null }) {
           displayName={localDisplayName}
           isHidden={isSelfVideoHidden}
           onToggleHide={toggleSelfVideoVisibility}
-          isAudioEnabled={isAudioEnabled}
-          isVideoEnabled={isVideoEnabled}
+          /* mediaLocked (the welcome modal) already forces the Daily tracks off in
+             App.jsx, so the local tile has to render muted / camera-off to match —
+             otherwise the player watches a live self-view while sending nothing. It
+             never overwrites the toggle state, so releasing the lock restores it. */
+          isAudioEnabled={isAudioEnabled && !mediaLocked}
+          isVideoEnabled={isVideoEnabled && !mediaLocked}
           onToggleAudio={toggleAudio}
           onToggleVideo={toggleVideo}
         />
