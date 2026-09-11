@@ -51,6 +51,19 @@ const PRESENCE_SWEEP_MS = 1000;
 // lobby roster before their first `lastSeen` ever arrives.
 const NEW_JOINER_GRACE_MS = 30000;
 
+// Lobby video rooms. Each lobby (group name + scenario, see lobbyGroupName) gets
+// its own Daily room, created on demand by the presence sweep and stored on the
+// waiting game under `lobbyRooms[lobbyKey]`. A room is replaced once it is within
+// LOBBY_ROOM_ROTATE_MARGIN_S of its expiry — Daily refuses joins after `exp`, and
+// the margin guarantees nobody is ever handed a token for a room that will shut
+// while they are still in it. Rotation re-mints every present member's token, and
+// the client's room-transition logic moves them over.
+const LOBBY_ROOM_TTL_S = 12 * 60 * 60;
+const LOBBY_ROOM_ROTATE_MARGIN_S = 60 * 60;
+// The sweep runs every second; without this a Daily outage would become a
+// request per second per lobby/player. Minimum gap between failed attempts.
+const DAILY_ENSURE_BACKOFF_MS = 30000;
+
 // Which club serves this deployment's role data. The env var wins; otherwise
 // sniff this machine's Caddyfile: the prod box serves platform.negotiation.education
 // (→ app club), the dev box serves platformdev.negotiation.education (→ dev club).
@@ -189,24 +202,33 @@ async function dailyRequest(label, path, body) {
   }
 }
 
-// Helper function to create Daily.co room for waiting game
-async function createDailyRoom(roomName) {
-  const roomExp = Math.round(Date.now() / 1000) + 60 * 60 * 8; // 8 hour expiry
+// Daily room names allow only [A-Za-z0-9_-]; keep each human part short so the
+// full name stays well inside Daily's limits.
+function dailyNamePart(s, max = 12) {
+  return String(s || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, max) || "x";
+}
 
-  const res = await dailyRequest(`create waiting room ${roomName}`, "rooms", {
+// Create the Daily room for one lobby. The timestamp suffix makes every room
+// name unique, so a rotation or a same-day repeat of a group name can never hit
+// Daily's "room already exists" error. Lobby rooms are deliberately NOT
+// recording-enabled: the lobby is pre-negotiation chatter, and with one room per
+// lobby it would otherwise be one raw-tracks recording per lobby. Game rooms
+// (setupGameOnStart) keep recording.
+async function createLobbyRoom(displayGroupName, scenario) {
+  const roomExp = Math.round(Date.now() / 1000) + LOBBY_ROOM_TTL_S;
+  const roomName =
+    `lobby_${dailyNamePart(displayGroupName)}_${dailyNamePart(scenario)}_${Date.now().toString(36)}`;
+
+  const res = await dailyRequest(`create lobby room ${roomName}`, "rooms", {
     name: roomName,
-    properties: {
-      exp: roomExp,
-      enable_recording: "raw-tracks",
-      enable_transcription_storage: true,
-    },
+    properties: { exp: roomExp },
   });
 
   if (!res.ok || !res.data?.url) {
     return null;
   }
 
-  console.log(`[DAILY] Room created: ${res.data.url}`);
+  console.log(`[DAILY] Lobby room created: ${res.data.url}`);
   return { url: res.data.url, roomName, expiry: roomExp };
 }
 
@@ -298,12 +320,11 @@ async function doCreateWaitingGame(ctx, batch) {
     return existingWaitingGame;
   }
 
-  // Create Daily.co room for waiting game
-  const d = new Date();
-  const today = `${d.getFullYear()}_${String(d.getMonth()+1).padStart(2,'0')}_${String(d.getDate()).padStart(2,'0')}`;
-  const roomName = `waiting_room_${batch.id}_${today}`;
-
-  const roomData = await createDailyRoom(roomName);
+  // No Daily room here: lobby video rooms are per lobby (group + scenario), not
+  // per batch, and are created on demand by the presence sweep — see
+  // reconcileLobbyVideo. A per-batch room made everyone in the batch subscribe
+  // to everyone else, and its fixed expiry outlived by the batch left the whole
+  // lobby without video.
 
   // Real per-game size, used by the lobby to preview assignment splits.
   // The `treatment.playerCount: 1000` below is a placeholder so everyone
@@ -330,12 +351,11 @@ async function doCreateWaitingGame(ctx, batch) {
     { key: "batchID", value: batch.id },
     { key: "isWaiting", value: true },
     { key: "name", value: "Waiting Room" },
-    { key: "roomUrl", value: roomData?.url || null },
-    { key: "dailyRoomName", value: roomData?.roomName || null },
-    { key: "dailyRoomExpiry", value: roomData?.expiry || null },
     { key: "gamePlayerCount", value: cfgPlayerCount },
     { key: "scenarioSizes", value: scenarioSizes },
     { key: "scenarioNames", value: scenarioNames },
+    // lobbyKey -> { url, roomName, expiry }, filled by reconcileLobbyVideo.
+    { key: "lobbyRooms", value: {} },
   ]);
 
   Empirica.flush();
@@ -358,7 +378,7 @@ async function doCreateWaitingGame(ctx, batch) {
     return null;
   }
 
-  console.log(`[BATCH] Created waiting game ${waitingGame.id} for batch ${batch.id} with Daily room: ${roomData?.url}`);
+  console.log(`[BATCH] Created waiting game ${waitingGame.id} for batch ${batch.id}`);
   return waitingGame;
 }
 
@@ -426,9 +446,124 @@ function sweepLobbyPresence(ctx) {
     if (changed) {
       game.set("waitingPlayers", waitingPlayers);
     }
+
+    reconcileLobbyVideo(game, waitingPlayers, playerById);
   }
 
   if (waitingGames.length > 0) Empirica.flush();
+}
+
+// ---------------------------------------------------------------------------
+// Lobby video reconciliation. Runs from the sweep once per second per waiting
+// game and is idempotent: it only calls Daily when a lobby with members has no
+// usable room, or a member holds no token for that room. Everything async is
+// fire-and-forget behind an in-flight guard plus a backoff, so the sweep never
+// stacks requests and a Daily outage costs one attempt per key per backoff.
+// ---------------------------------------------------------------------------
+
+// `${game.id}\0${lobbyKey}` -> true while a room create is running.
+const lobbyRoomInFlight = new Set();
+// player.id -> true while a token mint is running.
+const tokenInFlight = new Set();
+// Same keys as above -> Date.now() of the last failed attempt.
+const ensureLastFailure = new Map();
+
+function lobbyRoomIsUsable(room, nowS) {
+  return !!room?.url && !!room?.roomName &&
+    typeof room.expiry === "number" &&
+    room.expiry - nowS > LOBBY_ROOM_ROTATE_MARGIN_S;
+}
+
+function backoffActive(key, now) {
+  const last = ensureLastFailure.get(key);
+  return last != null && now - last < DAILY_ENSURE_BACKOFF_MS;
+}
+
+async function ensureLobbyRoom(game, lobbyKey, displayGroupName, scenario) {
+  const guardKey = `${game.id} ${lobbyKey}`;
+  if (lobbyRoomInFlight.has(guardKey)) return;
+  lobbyRoomInFlight.add(guardKey);
+  try {
+    const room = await createLobbyRoom(displayGroupName, scenario);
+    if (!room) {
+      ensureLastFailure.set(guardKey, Date.now());
+      return;
+    }
+    ensureLastFailure.delete(guardKey);
+    // Re-read: other lobbies' rooms may have landed while we awaited.
+    game.set("lobbyRooms", { ...(game.get("lobbyRooms") || {}), [lobbyKey]: room });
+    Empirica.flush();
+    console.log(`[LOBBY VIDEO] Room for lobby "${displayGroupName}" / "${scenario}" on game ${game.id}: ${room.roomName}`);
+  } catch (err) {
+    ensureLastFailure.set(guardKey, Date.now());
+    console.error(`[LOBBY VIDEO] ensureLobbyRoom failed for "${displayGroupName}" / "${scenario}":`, err);
+  } finally {
+    lobbyRoomInFlight.delete(guardKey);
+  }
+}
+
+async function ensureLobbyToken(player, room) {
+  if (tokenInFlight.has(player.id)) return;
+  tokenInFlight.add(player.id);
+  try {
+    const token = await createMeetingToken(room.roomName, player, room.expiry);
+    if (!token) {
+      ensureLastFailure.set(player.id, Date.now());
+      return;
+    }
+    ensureLastFailure.delete(player.id);
+    player.set("dailyMeetingToken", token);
+    // Records which room the token is for, so the sweep can tell "has a token"
+    // from "has a token for THIS room" without a Daily call.
+    player.set("dailyTokenRoom", room.roomName);
+    Empirica.flush();
+  } catch (err) {
+    ensureLastFailure.set(player.id, Date.now());
+    console.error(`[LOBBY VIDEO] ensureLobbyToken failed for player ${player.id}:`, err);
+  } finally {
+    tokenInFlight.delete(player.id);
+  }
+}
+
+function reconcileLobbyVideo(game, waitingPlayers, playerById) {
+  const now = Date.now();
+  const nowS = Math.round(now / 1000);
+  const lobbyRooms = game.get("lobbyRooms") || {};
+
+  // Group the roster by lobby key, skipping entries that have not converged:
+  // no group name yet, or no scenario yet. Those players are still in the
+  // intro; their key will change, so a room for it would be wasted.
+  const lobbies = new Map();
+  for (const info of Object.values(waitingPlayers)) {
+    if (!info.groupName || info.displayGroupName === NO_GROUP_NAME || !info.scenario) continue;
+    if (!lobbies.has(info.groupName)) {
+      lobbies.set(info.groupName, { displayGroupName: info.displayGroupName, scenario: info.scenario, members: [] });
+    }
+    lobbies.get(info.groupName).members.push(info.id);
+  }
+
+  for (const [lobbyKey, lobby] of lobbies) {
+    const room = lobbyRooms[lobbyKey];
+
+    if (!lobbyRoomIsUsable(room, nowS)) {
+      if (room) {
+        console.log(`[LOBBY VIDEO] Room ${room.roomName} for lobby "${lobby.displayGroupName}" / "${lobby.scenario}" is within ${LOBBY_ROOM_ROTATE_MARGIN_S}s of expiry, rotating`);
+      }
+      if (!backoffActive(`${game.id} ${lobbyKey}`, now)) {
+        ensureLobbyRoom(game, lobbyKey, lobby.displayGroupName, lobby.scenario);
+      }
+      // Tokens follow on a later tick, once the room is stored.
+      continue;
+    }
+
+    for (const playerId of lobby.members) {
+      const player = playerById.get(playerId);
+      if (!player) continue;
+      if (player.get("dailyTokenRoom") === room.roomName && player.get("dailyMeetingToken")) continue;
+      if (backoffActive(playerId, now)) continue;
+      ensureLobbyToken(player, room);
+    }
+  }
 }
 
 // The functional lobby identity: two players share a lobby only if they share
@@ -1209,17 +1344,9 @@ async function assignToWaitingGame(ctx, player) {
     rosterIds: Object.keys(waitingPlayers),
   });
 
-  // Create meeting token for player if room exists
-  const roomName = waitingGame.get("dailyRoomName");
-  const roomExpiry = waitingGame.get("dailyRoomExpiry");
-
-  if (roomName && roomExpiry) {
-    const token = await createMeetingToken(roomName, player, roomExpiry);
-    if (token) {
-      player.set("dailyMeetingToken", token);
-      Empirica.flush();
-    }
-  }
+  // No meeting token here: the player's lobby (group + scenario) is not known
+  // until the client writes those attributes. The presence sweep mints a token
+  // for the lobby's room once the roster entry has converged (reconcileLobbyVideo).
 
   // Surface a missing/unknown scenario in the lobby (the player is now in the room,
   // so CustomLobby can render the error). Only matters for multi-treatment batches.
@@ -1331,29 +1458,9 @@ Empirica.on("player", "displayName", async (ctx, { player }) => {
   refreshWaitingPlayerEntry(ctx, player, "displayName");
 });
 
-// When player completes intro, mark them ready
-Empirica.on("player", "introDone", async (ctx, { player }) => {
-  if (!player.get("introDone")) return;
-  console.log(`[PLAYER] Player ${player.id} completed intro`);
-
-  // Create token if not already created (in case they completed intro before assignment)
-  if (!player.get("dailyMeetingToken")) {
-    const game = Array.from(ctx.scopesByKind("game").values())
-      .find(g => g.id === player.get("gameID"));
-
-    if (game && game.get("isWaiting") && game.get("dailyRoomName")) {
-      const token = await createMeetingToken(
-        game.get("dailyRoomName"),
-        player,
-        game.get("dailyRoomExpiry")
-      );
-      if (token) {
-        player.set("dailyMeetingToken", token);
-        Empirica.flush();
-      }
-    }
-  }
-});
+// NOTE: there is deliberately no `introDone` token listener any more. Lobby
+// tokens are minted by the presence sweep (reconcileLobbyVideo) for whichever
+// room the player's lobby currently has, so completing the intro needs no hook.
 
 // ============================================================================
 // GAME EVENTS - Existing game start logic
@@ -1573,6 +1680,9 @@ function setupGameOnStart(game) {
         const token = await createMeetingToken(roomName, player, roomExp);
         if (token) {
           player.set("dailyMeetingToken", token);
+          // Keep the token/room pairing truthful across the lobby → game handoff
+          // (the lobby only joins when these two agree).
+          player.set("dailyTokenRoom", roomName);
           Empirica.flush();
         }
       });

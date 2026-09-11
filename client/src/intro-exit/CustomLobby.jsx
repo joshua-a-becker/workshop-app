@@ -245,12 +245,28 @@ export function CustomLobby() {
   // would leave the un-converged players behind. Waiting makes the invariant
   // simple — if you can see the lobby, the server and you agree on your group
   // and scenario, and so does everyone you can see.
+  //
+  // The heartbeat lives here, above that gate, and not inside CustomLobbyInner.
+  // The server sweep prunes anyone whose heartbeat goes stale and only re-adds
+  // players who are heartbeating, so a heartbeat that stops the moment the entry
+  // disappears can never bring it back: one gap (a WiFi blip, a refresh, a slow
+  // intro) would strand the player on the loading panel for good.
   const myEntry = game?.get("waitingPlayers")?.[player?.id];
   if (!myEntry || myEntry.groupName !== groupKey) {
-    return <LobbyLoadingPanel />;
+    return (
+      <>
+        <Heartbeat />
+        <LobbyLoadingPanel />
+      </>
+    );
   }
 
-  return <CustomLobbyInner />;
+  return (
+    <>
+      <Heartbeat />
+      <CustomLobbyInner />
+    </>
+  );
 }
 
 function CustomLobbyInner() {
@@ -319,8 +335,16 @@ function CustomLobbyInner() {
     return list;
   }, [player?.id, myDisplayName, groupMembers]);
 
-  // Check if video chat is available (room URL and token exist)
-  const hasVideoRoom = game?.get("roomUrl") && player?.get("dailyMeetingToken");
+  // This lobby's own Daily room (one per group + scenario, created on demand by
+  // the server's presence sweep and stored on the waiting game). Only join once
+  // our token was minted for THIS room: during a room rotation the room changes
+  // first and the token catches up a tick later, and joining with a token for a
+  // different room would simply fail.
+  const lobbyRoom = game?.get("lobbyRooms")?.[myGroupName];
+  const hasVideoRoom =
+    !!lobbyRoom?.url &&
+    !!player?.get("dailyMeetingToken") &&
+    player?.get("dailyTokenRoom") === lobbyRoom.roomName;
   const hasCompletedIntro = player?.get("introDone");
 
   // [DIAG] Full lobby snapshot every render: who am I, what game am I attached
@@ -396,7 +420,6 @@ function CustomLobbyInner() {
 
   return (
     <div className="h-screen w-screen bg-gray-100 flex">
-      <Heartbeat />
       {showAssignmentModal && (
         <AssignmentModal
           players={assignmentPlayers}
@@ -476,7 +499,11 @@ function CustomLobbyInner() {
       <div className="flex-1 p-4">
         {hasVideoRoom && hasCompletedIntro ? (
           <div className="h-full rounded-lg overflow-hidden">
-            <VideoChat defaultHideSelf={false} filterPlayerIds={groupMemberIds} />
+            <VideoChat
+              defaultHideSelf={false}
+              filterPlayerIds={groupMemberIds}
+              roomUrl={lobbyRoom.url}
+            />
           </div>
         ) : (
           <div className="h-full bg-gray-200 rounded-lg flex items-center justify-center">

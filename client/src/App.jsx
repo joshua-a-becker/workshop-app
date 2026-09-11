@@ -105,6 +105,18 @@ export default function App() {
   const [hasJoinedCall, setHasJoinedCall] = useState(false);
   const participantTracksRef = useRef({});
   const joinedRoomUrlRef = useRef(null);
+  // Timer handles for the participant polling loops started in handleJoined.
+  // They close over their call object, so they must be cleared whenever that
+  // object is left/destroyed (room transition, teardown): a destroyed call
+  // object reports an empty participant map, and a leaked loop would then wipe
+  // the NEXT room's remote streams every tick.
+  const pollTimersRef = useRef([]);
+  const clearPollTimers = () => {
+    pollTimersRef.current.forEach(({ kind, id }) =>
+      kind === "timeout" ? clearTimeout(id) : clearInterval(id)
+    );
+    pollTimersRef.current = [];
+  };
 
   const [callState, setCallState] = useState({
     remoteStreams: {},
@@ -306,7 +318,7 @@ export default function App() {
       return;
     }
 
-    const { roomUrl, meetingToken, displayName, participantIdentifier } = callJoinData;
+    const { roomUrl, meetingToken, displayName, participantIdentifier, record } = callJoinData;
 
     if (!roomUrl || !meetingToken) {
       return;
@@ -457,6 +469,10 @@ export default function App() {
         // This catches cases where participant-updated doesn't fire or fires before tracks are ready
         // Also handles rejoiners since events don't fire reliably for them
 
+        // Defensive: a previous join's loops should already be gone, but never
+        // let two sets run against different call objects.
+        clearPollTimers();
+
         // Fast polling for first 10 seconds (initial join scenario)
         const fastPollInterval = setInterval(() => {
           const currentParticipants = callObject.participants();
@@ -496,14 +512,16 @@ export default function App() {
             }
           });
         }, 500); // Poll every 500ms
+        pollTimersRef.current.push({ kind: "interval", id: fastPollInterval });
 
         // After 10 seconds, switch to slow polling to catch rejoiners
-        setTimeout(() => {
+        const switchTimeout = setTimeout(() => {
           clearInterval(fastPollInterval);
           // console.log("Switching to slow polling for rejoiners");
 
-          // Slow polling continues indefinitely to catch people who rejoin
-          setInterval(() => {
+          // Slow polling continues until the call is left (see clearPollTimers)
+          // to catch people who rejoin
+          const slowPollInterval = setInterval(() => {
             const currentParticipants = callObject.participants();
             const currentRemoteIds = Object.keys(currentParticipants).filter(id => id !== "local");
 
@@ -628,7 +646,9 @@ export default function App() {
               };
             });
           }, 2000); // Poll every 2 seconds (slow but catches rejoiners)
+          pollTimersRef.current.push({ kind: "interval", id: slowPollInterval });
         }, 10000);
+        pollTimersRef.current.push({ kind: "timeout", id: switchTimeout });
 
         if (local) {
           const displayName = local.userData?.displayName || "You";
@@ -639,6 +659,12 @@ export default function App() {
               [local.session_id]: displayName,
             },
           }));
+        }
+
+        // Lobby rooms are neither recorded nor transcribed (VideoChat sets
+        // `record` false for a waiting game); game rooms are.
+        if (!record) {
+          return;
         }
 
         try {
@@ -906,6 +932,7 @@ export default function App() {
     console.log("Room transition:", joinedRoomUrlRef.current, "→", callJoinData.roomUrl);
 
     const transitionRoom = async () => {
+      clearPollTimers();
       const callObject = callObjectRef.current;
       if (callObject) {
         try {
@@ -1077,6 +1104,7 @@ export default function App() {
   // media and rejoins on its own when the negotiation stage mounts it.
   // Idempotent: safe to call when already torn down.
   const teardownCall = useCallback(async () => {
+    clearPollTimers();
     const callObject = callObjectRef.current;
     if (callObject) {
       // Guard each step independently: stopRecording/stopTranscription/leave are

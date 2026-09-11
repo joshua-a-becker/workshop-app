@@ -261,7 +261,9 @@ const RemoteVideoComponent = React.memo(({ stream, name, sessionId, onRequestRef
 });
 
 // filterPlayerIds: optional Set of player IDs to show (if provided, only show these participants)
-export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null }) {
+// roomUrl: optional override of the game's roomUrl. The lobby passes its own
+//   per-lobby room; game stages pass nothing and use the game's room as before.
+export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null, roomUrl: roomUrlProp = null }) {
   const localVideoRef = useRef();
   const player = usePlayer();
   const players = usePlayers();
@@ -284,8 +286,10 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null }) {
     mediaLocked,
   } = useContext(DailyCallContext);
 
-  const roomUrl = game?.get("roomUrl");
+  const roomUrl = roomUrlProp ?? game?.get("roomUrl");
   const meetingToken = player?.get("dailyMeetingToken");
+  // Lobby rooms are not recorded or transcribed; game rooms are.
+  const record = !game?.get("isWaiting");
   const [isSelfVideoHidden, setIsSelfVideoHidden] = useState(defaultHideSelf);
 
   // Track all Daily.co participants (not just those with streams)
@@ -433,11 +437,12 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null }) {
         meetingToken,
         displayName: currentDisplayName,
         participantIdentifier: currentParticipantIdentifier,
+        record,
       });
     }
     // Only re-register if critical join data changes (roomUrl, token)
     // Note: displayName should not change during a game session
-  }, [roomUrl, meetingToken, player, game, registerCallData]);
+  }, [roomUrl, meetingToken, record, player, game, registerCallData]);
 
   // Set local video track when available
   useEffect(() => {
@@ -533,7 +538,6 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null }) {
     return () => clearInterval(intervalId);
   }, [callObject, player]);
 
-  window.player=player;
 
   // Pick the column count that yields the largest possible 16:9 video per tile
   // in the measured container — a tall narrow panel stacks, a wide one goes
