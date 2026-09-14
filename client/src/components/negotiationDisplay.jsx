@@ -138,7 +138,7 @@ function FeatureRows({ roleScoresheet, selection, onSelectionChange }) {
               </span>
               <span className={`text-sm font-bold flex-shrink-0 w-[80px] text-center ${
                 isChecked
-                  ? (includeOption.score >= 0 ? 'text-blue-600' : 'text-red-600')
+                  ? 'text-blue-600'
                   : 'text-gray-400'
               }`}>
                 {includeOption.score >= 0 ? '+' : ''}{includeOption.score}
@@ -179,7 +179,7 @@ function ChoiceRows({ roleScoresheet, selection, onSelectionChange }) {
             </select>
             <span className={`text-sm font-bold flex-shrink-0 w-[80px] text-center ${
               chosen
-                ? (chosen.score >= 0 ? 'text-blue-600' : 'text-red-600')
+                ? 'text-blue-600'
                 : 'text-gray-400'
             }`}>
               {chosen ? `${chosen.score >= 0 ? '+' : ''}${chosen.score}` : '—'}
@@ -194,7 +194,9 @@ function ChoiceRows({ roleScoresheet, selection, onSelectionChange }) {
   );
 }
 
-function ChoiceTableRows({ roleScoresheet, selection, onSelectionChange }) {
+// One block per issue with one row per option. In readOnly mode there are no
+// radios and no selection state: every score is shown in its full color.
+function ChoiceTableRows({ roleScoresheet, selection = {}, onSelectionChange, readOnly = false }) {
   return (
     <>
       {Object.entries(roleScoresheet).map(([issue, options]) => {
@@ -207,36 +209,38 @@ function ChoiceTableRows({ roleScoresheet, selection, onSelectionChange }) {
             </div>
             <div className="flex-1 divide-y divide-gray-100">
               {options.map((opt, i) => {
-                const isChecked = idx === i;
+                const isChecked = !readOnly && idx === i;
+                const scoreCls = 'text-blue-600';
+                const Row = readOnly ? 'div' : 'label';
                 return (
-                  <label
+                  <Row
                     key={i}
-                    className={`flex items-center px-3 py-1 cursor-pointer hover:bg-blue-50 ${
-                      isChecked ? 'bg-blue-50' : ''
-                    }`}
+                    className={`flex items-center px-3 py-1 ${
+                      readOnly ? '' : 'cursor-pointer hover:bg-blue-50'
+                    } ${isChecked ? 'bg-blue-50' : ''}`}
                   >
-                    <span className={`text-sm flex-1 ${
+                    <span className={`text-sm flex-1 ${readOnly ? 'whitespace-nowrap pr-4' : ''} ${
                       isChecked ? 'font-semibold text-gray-900' : 'text-gray-800'
                     }`}>
                       {opt.option}
                     </span>
                     <span className="flex items-center justify-end flex-shrink-0 w-[90px]">
-                      <input
-                        type="radio"
-                        name={`mc-table-${issue}`}
-                        checked={isChecked}
-                        onChange={() => onSelectionChange({ ...selection, [issue]: i })}
-                        className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer mr-2"
-                      />
+                      {!readOnly && (
+                        <input
+                          type="radio"
+                          name={`mc-table-${issue}`}
+                          checked={isChecked}
+                          onChange={() => onSelectionChange({ ...selection, [issue]: i })}
+                          className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer mr-2"
+                        />
+                      )}
                       <span className={`text-sm font-bold w-[50px] text-center ${
-                        isChecked
-                          ? (opt.score >= 0 ? 'text-blue-600' : 'text-red-600')
-                          : 'text-gray-400'
+                        readOnly || isChecked ? scoreCls : 'text-gray-400'
                       }`}>
                         {opt.score >= 0 ? '+' : ''}{opt.score}
                       </span>
                     </span>
-                  </label>
+                  </Row>
                 );
               })}
             </div>
@@ -244,6 +248,41 @@ function ChoiceTableRows({ roleScoresheet, selection, onSelectionChange }) {
         );
       })}
     </>
+  );
+}
+
+function ChoiceTableHeader() {
+  return (
+    <div className="flex items-center px-3 py-1">
+      <span className="text-xs font-bold text-gray-700 uppercase flex-shrink-0 w-[140px]">
+        Issue
+      </span>
+      <span className="text-xs font-bold text-gray-700 uppercase flex-1">
+        Option
+      </span>
+      <span className="text-xs font-bold text-gray-700 uppercase flex-shrink-0 w-[90px] text-right">
+        Value
+      </span>
+    </div>
+  );
+}
+
+// View-only payoff table for multiple_choice: issues / options / values, no
+// selection and no calculator. Shown under the narrative on the negotiate page.
+export function ScoresheetTable({ roleScoresheet, title }) {
+  // Full-width blue panel; inside it, the title + table sit as one centered
+  // column that is only as wide as the longest option row (blocks share the
+  // width of the widest one), capped at the panel width.
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex justify-center">
+      <div className="w-fit max-w-full">
+        {title && <h3 className="text-2xl font-bold text-blue-900 mb-4">{title}</h3>}
+        <ChoiceTableHeader />
+        <div className="space-y-1.5">
+          <ChoiceTableRows roleScoresheet={roleScoresheet} readOnly />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -323,17 +362,7 @@ export function ScoringCalculator({
 
       {/* Table header (choice types only) */}
       {isChoiceTable ? (
-        <div className="flex items-center px-3 py-1">
-          <span className="text-xs font-bold text-gray-700 uppercase flex-shrink-0 w-[140px]">
-            Issue
-          </span>
-          <span className="text-xs font-bold text-gray-700 uppercase flex-1">
-            Option
-          </span>
-          <span className="text-xs font-bold text-gray-700 uppercase flex-shrink-0 w-[90px] text-right">
-            Value
-          </span>
-        </div>
+        <ChoiceTableHeader />
       ) : !isPrice && (
         <div className="flex items-center px-3 py-1">
           {isFeatures && <span className="w-6"></span>}

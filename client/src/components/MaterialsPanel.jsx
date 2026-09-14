@@ -4,6 +4,8 @@ import { usePlayer, useStage, useRound, useGame } from "@empirica/core/player/cl
 import { DailyCallContext } from "../App";
 import {
   ScoringCalculator,
+  ScoresheetTable,
+  MULTIPLE_CHOICE,
   ProposalDetails,
   proposalValue,
   batnaThreshold,
@@ -357,6 +359,11 @@ export function MaterialsPanel({
                 <Markdown>{roleNarrative}</Markdown>
               </div>
             </div>
+
+            {/* View-only payoff table (multiple_choice only) */}
+            {type === MULTIPLE_CHOICE && roleScoresheet && (
+              <ScoresheetTable roleScoresheet={roleScoresheet} title="Your Scoresheet" />
+            )}
           </div>
         )}
 
