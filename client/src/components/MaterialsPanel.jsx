@@ -370,9 +370,6 @@ export function MaterialsPanel({
               {roleBATNA && (
                 <p className="text-sm text-gray-700 mb-1">{roleBATNA}</p>
               )}
-              <p className="text-sm text-gray-700">
-                If you don't reach agreement, you will earn <span className="font-bold">{threshold} value</span>.
-              </p>
             </div>
 
             {/* Main Scoring Area (type-aware) */}

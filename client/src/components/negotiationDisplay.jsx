@@ -5,6 +5,13 @@
 //   "multiple_choice" - one ordered dropdown per issue (order preserved from JSON)
 //   "price"           - a single number; value = multiplier * (rp - price)
 //
+// Display-only variant (never stored on the game, never sent to the server):
+//   "multiple_choice_table" - multiple_choice rendered as a full payoff table:
+//                             one block per issue, one radio row per option, so
+//                             the whole scoresheet is visible at once. Used on
+//                             the Read Negotiation Role stage. All value logic
+//                             treats it exactly like "multiple_choice".
+//
 // "value" is the single unifying concept across all three (it replaces the old
 // "points"). The same rule applies everywhere: never accept a deal worth < 0.
 //
@@ -18,6 +25,12 @@ import React from "react";
 export const FEATURES = "features";
 export const MULTIPLE_CHOICE = "multiple_choice";
 export const PRICE = "price";
+export const MULTIPLE_CHOICE_TABLE = "multiple_choice_table";
+
+// Collapse the display-only table variant back to the underlying value type.
+export function valueType(type) {
+  return type === MULTIPLE_CHOICE_TABLE ? MULTIPLE_CHOICE : type;
+}
 
 // ---------------------------------------------------------------------------
 // Value logic
@@ -111,29 +124,29 @@ function FeatureRows({ roleScoresheet, selection, onSelectionChange }) {
           const includeOption = options[0];
           const isChecked = selection[category] === 0;
           return (
-            <div key={category} className="flex items-center bg-white rounded px-4 py-2.5 border border-blue-300">
+            <label key={category} className="flex items-center bg-white rounded px-3 py-1 border border-blue-300 cursor-pointer hover:bg-blue-50">
               <input
                 type="checkbox"
                 checked={isChecked}
                 onChange={(e) =>
                   onSelectionChange({ ...selection, [category]: e.target.checked ? 0 : 1 })
                 }
-                className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer mr-3"
+                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer mr-2"
               />
-              <span className="text-sm font-semibold text-gray-800 flex-shrink-0 w-[140px]">
+              <span className="text-sm font-semibold text-gray-800 flex-shrink-0 w-[200px]">
                 {category.replace(/_/g, " ")}
               </span>
-              <span className={`text-base font-bold flex-shrink-0 w-[80px] text-center ${
+              <span className={`text-sm font-bold flex-shrink-0 w-[80px] text-center ${
                 isChecked
                   ? (includeOption.score >= 0 ? 'text-blue-600' : 'text-red-600')
                   : 'text-gray-400'
               }`}>
                 {includeOption.score >= 0 ? '+' : ''}{includeOption.score}
               </span>
-              <span className="text-sm text-gray-600 flex-1 ml-4">
+              <span className="text-sm text-gray-600 flex-1 ml-3">
                 {includeOption.reason}
               </span>
-            </div>
+            </label>
           );
         })}
     </>
@@ -147,7 +160,7 @@ function ChoiceRows({ roleScoresheet, selection, onSelectionChange }) {
         const idx = selection[issue];
         const chosen = (idx !== undefined && idx !== null) ? options[idx] : null;
         return (
-          <div key={issue} className="flex items-center bg-white rounded px-4 py-2.5 border border-blue-300">
+          <div key={issue} className="flex items-center bg-white rounded px-3 py-1 border border-blue-300">
             <span className="text-sm font-semibold text-gray-800 flex-shrink-0 w-[140px]">
               {issue.replace(/_/g, " ")}
             </span>
@@ -157,23 +170,76 @@ function ChoiceRows({ roleScoresheet, selection, onSelectionChange }) {
                 const val = e.target.value;
                 onSelectionChange({ ...selection, [issue]: val === "" ? undefined : Number(val) });
               }}
-              className="flex-shrink-0 w-[180px] border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-800 bg-white focus:ring-2 focus:ring-blue-500 cursor-pointer mr-4"
+              className="flex-shrink-0 w-[180px] border border-gray-300 rounded px-2 py-1 text-sm text-gray-800 bg-white focus:ring-2 focus:ring-blue-500 cursor-pointer mr-3"
             >
               <option value="">— Select —</option>
               {options.map((opt, i) => (
                 <option key={i} value={i}>{opt.option}</option>
               ))}
             </select>
-            <span className={`text-base font-bold flex-shrink-0 w-[80px] text-center ${
+            <span className={`text-sm font-bold flex-shrink-0 w-[80px] text-center ${
               chosen
                 ? (chosen.score >= 0 ? 'text-blue-600' : 'text-red-600')
                 : 'text-gray-400'
             }`}>
               {chosen ? `${chosen.score >= 0 ? '+' : ''}${chosen.score}` : '—'}
             </span>
-            <span className="text-sm text-gray-600 flex-1 ml-4">
+            <span className="text-sm text-gray-600 flex-1 ml-3">
               {chosen?.reason || ''}
             </span>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+function ChoiceTableRows({ roleScoresheet, selection, onSelectionChange }) {
+  return (
+    <>
+      {Object.entries(roleScoresheet).map(([issue, options]) => {
+        const idx = selection[issue];
+        return (
+          <div key={issue} className="flex bg-white rounded border border-blue-300">
+            {/* Issue name: one cell spanning all option rows of this block */}
+            <div className="flex-shrink-0 w-[140px] px-3 py-1 text-sm font-semibold text-gray-800 border-r border-gray-100">
+              {issue.replace(/_/g, " ")}
+            </div>
+            <div className="flex-1 divide-y divide-gray-100">
+              {options.map((opt, i) => {
+                const isChecked = idx === i;
+                return (
+                  <label
+                    key={i}
+                    className={`flex items-center px-3 py-1 cursor-pointer hover:bg-blue-50 ${
+                      isChecked ? 'bg-blue-50' : ''
+                    }`}
+                  >
+                    <span className={`text-sm flex-1 ${
+                      isChecked ? 'font-semibold text-gray-900' : 'text-gray-800'
+                    }`}>
+                      {opt.option}
+                    </span>
+                    <span className="flex items-center justify-end flex-shrink-0 w-[90px]">
+                      <input
+                        type="radio"
+                        name={`mc-table-${issue}`}
+                        checked={isChecked}
+                        onChange={() => onSelectionChange({ ...selection, [issue]: i })}
+                        className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer mr-2"
+                      />
+                      <span className={`text-sm font-bold w-[50px] text-center ${
+                        isChecked
+                          ? (opt.score >= 0 ? 'text-blue-600' : 'text-red-600')
+                          : 'text-gray-400'
+                      }`}>
+                        {opt.score >= 0 ? '+' : ''}{opt.score}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
         );
       })}
@@ -230,15 +296,21 @@ export function ScoringCalculator({
   onPriceChange,
   title,
   footer,
+  // Tailwind width class for the right-hand value/actions panel. The live
+  // negotiation panel uses the default; read-role passes a narrower one.
+  valuePanelWidth = "w-[300px]",
 }) {
+  // `type` may be the display-only table variant; value logic uses the base type.
+  const vType = valueType(type);
   const role = { roleScoresheet, roleMultiplier, rolePriceRP };
-  const value = liveValue(type, role, selection, priceStr);
-  const threshold = batnaThreshold(type, roleRP);
-  const submittable = canSubmit(type, roleScoresheet, selection, priceStr);
+  const value = liveValue(vType, role, selection, priceStr);
+  const threshold = batnaThreshold(vType, roleRP);
+  const submittable = canSubmit(vType, roleScoresheet, selection, priceStr);
 
-  const isPrice = type === PRICE;
-  const isFeatures = type === FEATURES;
-  const isMultipleChoice = type === MULTIPLE_CHOICE;
+  const isPrice = vType === PRICE;
+  const isFeatures = vType === FEATURES;
+  const isMultipleChoice = vType === MULTIPLE_CHOICE;
+  const isChoiceTable = type === MULTIPLE_CHOICE_TABLE;
 
   // For features, an empty selection is a meaningful value (everything
   // excluded = 0). For multiple_choice and price there is no value until the
@@ -250,10 +322,22 @@ export function ScoringCalculator({
       {title && <h3 className="text-2xl font-bold text-blue-900 mb-4">{title}</h3>}
 
       {/* Table header (choice types only) */}
-      {!isPrice && (
-        <div className="flex items-center px-4 py-2 mb-1">
-          {isFeatures && <span className="w-8"></span>}
+      {isChoiceTable ? (
+        <div className="flex items-center px-3 py-1">
           <span className="text-xs font-bold text-gray-700 uppercase flex-shrink-0 w-[140px]">
+            Issue
+          </span>
+          <span className="text-xs font-bold text-gray-700 uppercase flex-1">
+            Option
+          </span>
+          <span className="text-xs font-bold text-gray-700 uppercase flex-shrink-0 w-[90px] text-right">
+            Value
+          </span>
+        </div>
+      ) : !isPrice && (
+        <div className="flex items-center px-3 py-1">
+          {isFeatures && <span className="w-6"></span>}
+          <span className={`text-xs font-bold text-gray-700 uppercase flex-shrink-0 ${isFeatures ? 'w-[200px]' : 'w-[140px]'}`}>
             {isFeatures ? "Feature" : "Issue"}
           </span>
           {isMultipleChoice && (
@@ -270,9 +354,9 @@ export function ScoringCalculator({
         </div>
       )}
 
-      <div className="flex gap-6">
+      <div className="flex gap-4">
         {/* Left: type-specific input rows */}
-        <div className="flex-[9] space-y-2">
+        <div className="flex-1 min-w-0 space-y-1.5">
           {isFeatures && (
             <FeatureRows
               roleScoresheet={roleScoresheet}
@@ -280,8 +364,15 @@ export function ScoringCalculator({
               onSelectionChange={onSelectionChange}
             />
           )}
-          {isMultipleChoice && (
+          {isMultipleChoice && !isChoiceTable && (
             <ChoiceRows
+              roleScoresheet={roleScoresheet}
+              selection={selection}
+              onSelectionChange={onSelectionChange}
+            />
+          )}
+          {isChoiceTable && (
+            <ChoiceTableRows
               roleScoresheet={roleScoresheet}
               selection={selection}
               onSelectionChange={onSelectionChange}
@@ -297,12 +388,12 @@ export function ScoringCalculator({
         </div>
 
         {/* Right: live value card + footer actions */}
-        <div className="flex-[4] flex flex-col items-center justify-start">
-          <div className="text-center bg-white rounded-lg p-6 shadow-md w-full">
+        <div className={`flex-shrink-0 ${valuePanelWidth} flex flex-col items-center justify-start`}>
+          <div className="text-center bg-white rounded-lg p-4 shadow-md w-full">
             <h3 className="text-lg font-semibold text-gray-700 mb-2">
               {isPrice ? "Your Value" : "Total Value"}
             </h3>
-            <div className="text-5xl font-bold mb-4">
+            <div className="text-4xl font-bold mb-3">
               <span className={valueReady ? "text-blue-600" : "text-gray-300"}>
                 {valueReady ? value.toFixed(2) : "-.--"}
               </span>
@@ -322,7 +413,7 @@ export function ScoringCalculator({
             )}
           </div>
 
-          {footer && <div className="mt-6 w-full">{footer}</div>}
+          {footer && <div className="mt-4 w-full">{footer}</div>}
         </div>
       </div>
     </div>

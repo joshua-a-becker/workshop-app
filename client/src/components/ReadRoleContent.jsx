@@ -1,13 +1,26 @@
 import React, { useState, useRef } from "react";
-import { usePlayer, useGame } from "@empirica/core/player/classic/react";
+import { usePlayer, useGame, useStage } from "@empirica/core/player/classic/react";
 import Markdown from "react-markdown";
-import { ScoringCalculator, batnaThreshold } from "./negotiationDisplay";
+import {
+  ScoringCalculator,
+  batnaThreshold,
+  MULTIPLE_CHOICE,
+  MULTIPLE_CHOICE_TABLE,
+} from "./negotiationDisplay";
 
 export function ReadRoleContent({ profileComponent }) {
   const player = usePlayer();
   const game = useGame();
+  const stage = useStage();
   const tips = game.get("tips") || "";
   const type = game.get("negotiationType") || "features";
+  // On the read-role stage, multiple_choice is shown as a full payoff table
+  // (radio rows per option) so the whole scoresheet is visible at once.
+  // Display-only: value logic and the server still see "multiple_choice".
+  const displayType =
+    type === MULTIPLE_CHOICE && stage?.get("name") === "Read Negotiation Role"
+      ? MULTIPLE_CHOICE_TABLE
+      : type;
   const priceConfig = game.get("priceConfig") || {};
   const roleName = player.get("roleName");
   const roleNarrative = player.get("roleNarrative");
@@ -118,7 +131,7 @@ export function ReadRoleContent({ profileComponent }) {
 
           {/* 3. Scoring Section (type-aware; practice only) */}
           <ScoringCalculator
-            type={type}
+            type={displayType}
             roleScoresheet={roleScoresheet}
             priceConfig={priceConfig}
             roleMultiplier={roleMultiplier}
@@ -129,6 +142,7 @@ export function ReadRoleContent({ profileComponent }) {
             priceStr={priceValue}
             onPriceChange={setPriceValue}
             title="Scoring"
+            valuePanelWidth="w-[240px]"
             footer={
               <button
                 onClick={() => { setSelectedOptions({}); setPriceValue(""); }}
