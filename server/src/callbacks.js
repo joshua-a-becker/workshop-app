@@ -1705,7 +1705,7 @@ function setupGameOnStart(game) {
   // Negotiation time is effectively unlimited — the impasse button (forceQuit)
   // and reaching agreement are how the stage ends, not the clock.
   const negotiateTime = 1000000;
-  const debriefTime = game.get("treatment")?.debriefTime ?? 1800;
+  const debriefTime = game.get("treatment")?.debriefTime ?? 18000;
 
 
   // Randomly assign roles to players
