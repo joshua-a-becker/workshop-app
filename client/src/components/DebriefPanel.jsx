@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { usePlayer, useGame } from "@empirica/core/player/classic/react";
+import { usePlayer, usePlayers, useGame } from "@empirica/core/player/classic/react";
 import { saveExerciseNote } from "../clubApi";
+import { agreementHtml } from "./negotiationDisplay";
 
 // The Debrief stage is fully data-driven from the role data's `debrief.tabs`
 // array. Each tab is { name, type?, html? }:
@@ -13,7 +14,7 @@ import { saveExerciseNote } from "../clubApi";
 // single Notes tab so every scenario at least captures reflection notes.
 const DEFAULT_TABS = [{ name: "Your Notes", type: "notes" }];
 
-function normalizeTabs(debrief) {
+export function normalizeTabs(debrief) {
   const tabs = debrief && debrief.tabs;
   if (
     Array.isArray(tabs) &&
@@ -27,7 +28,15 @@ function normalizeTabs(debrief) {
 
 // Lightweight template substitution for `html` tabs. Supports:
 //   {{#agreement}}…{{/agreement}} / {{#noAgreement}}…{{/noAgreement}} blocks
-//   {{score}} {{roleName}} {{displayName}} simple vars
+//   {{score}} {{roleName}} {{displayName}} — the viewing player's own values
+//   {{agreementDetails}} — the agreed terms (empty if no agreement)
+//   {{otherScores}} — every OTHER player's points, joined into a phrase that
+//       drops into a sentence after a comma, with the "and" placed for the
+//       count: "and 3 points to Tim" / "3 points to Tim, and 10 points to Jo"
+//       / "3 points to Tim, 10 points to Jo, and 4 points to Al". So authors
+//       write "…worth {{score}} points to you, {{otherScores}}." once and it
+//       reads correctly for 2 players or more.
+//   {{scoreTable}} — an HTML table of every role's points, viewer marked (you)
 // Deliberately tiny — no templating dependency.
 function renderTemplate(html, vars) {
   if (!html) return "";
@@ -35,37 +44,88 @@ function renderTemplate(html, vars) {
   const drop = vars.reachedAgreement ? "noAgreement" : "agreement";
   const blockRe = (name) =>
     new RegExp(`{{#${name}}}([\\s\\S]*?){{/${name}}}`, "g");
-  return html
-    .replace(blockRe(keep), "$1")
-    .replace(blockRe(drop), "")
-    .replace(/{{\s*score\s*}}/g, vars.score)
-    .replace(/{{\s*roleName\s*}}/g, vars.roleName)
-    .replace(/{{\s*displayName\s*}}/g, vars.displayName);
+  // Substitutions are plain strings (not regex replacement patterns), so a "$"
+  // in a value (e.g. a price) can't be misread as a backreference.
+  const sub = (name, value) =>
+    (h) => h.replace(new RegExp(`{{\\s*${name}\\s*}}`, "g"), () => value);
+  return [
+    (h) => h.replace(blockRe(keep), "$1").replace(blockRe(drop), ""),
+    sub("score", vars.score),
+    sub("roleName", vars.roleName),
+    sub("displayName", vars.displayName),
+    sub("agreementDetails", vars.agreementDetails),
+    sub("otherScores", vars.otherScores),
+    sub("scoreTable", vars.scoreTable),
+  ].reduce((h, f) => f(h), html);
 }
 
-export function DebriefPanel() {
-  const player = usePlayer();
-  const game = useGame();
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
+const formatScore = (n) => (Number(n) || 0).toFixed(2);
+
+// "and 3 points to Tim" | "3 points to Tim, and 10 points to Jo" | "a, b, and c"
+function otherScoresPhrase(others) {
+  const parts = others.map(
+    (o) => `${formatScore(o.score)} points to ${escapeHtml(o.roleName)}`
+  );
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return `and ${parts[0]}`;
+  return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
+}
+
+function scoreTableHtml(me, others) {
+  const row = (roleName, score, isMe) =>
+    `<tr><td>${escapeHtml(roleName)}${isMe ? " (you)" : ""}</td>` +
+    `<td>${formatScore(score)}</td></tr>`;
+  const rows = [row(me.roleName, me.score, true)]
+    .concat(others.map((o) => row(o.roleName, o.score, false)))
+    .join("");
+  return `<table><thead><tr><th>Role</th><th>Points</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// Build the template vars from plain data, so the Empirica-connected wrapper
+// below and the standalone preview page (DebriefPreview.jsx) go through one
+// code path and can't drift.
+//   me:     { roleName, displayName, bonus, reachedAgreement, roleScoresheet, finalProposal }
+//   others: [{ roleName, bonus }]
+export function buildDebriefVars({ me, others, negotiationType, priceConfig }) {
+  const roleName = me.roleName || "";
+  const bonus = me.bonus || 0;
+  const otherRows = (others || []).map((o) => ({
+    roleName: o.roleName,
+    score: o.bonus || 0,
+  }));
+  return {
+    reachedAgreement: !!me.reachedAgreement,
+    score: formatScore(bonus),
+    roleName,
+    displayName: me.displayName || "",
+    agreementDetails: agreementHtml(
+      negotiationType || "features",
+      me.roleScoresheet,
+      priceConfig || {},
+      me.finalProposal
+    ),
+    otherScores: otherScoresPhrase(otherRows),
+    scoreTable: scoreTableHtml({ roleName, score: bonus }, otherRows),
+  };
+}
+
+// Pure presentation: tab strip, the rendered html tab (or `notes` for a notes
+// tab), and the Continue button. No Empirica hooks, so it can be rendered
+// standalone by the preview page.
+export function DebriefView({ tabs, vars, notes }) {
   const [activeIndex, setActiveIndex] = useState(0);
-
-  const tabs = normalizeTabs(game.get("debrief"));
   // Clamp in case the tab set ever shrinks under us.
   const index = Math.min(activeIndex, tabs.length - 1);
   const tab = tabs[index];
   const nextTab = tabs[index + 1];
-
-  const scenario = player.get("scenario") || "";
-
-  const bonus = player.get("bonus") || 0;
-  // Set per-player in onRoundEnded; fall back to the score for older games.
-  const reachedAgreement = player.get("reachedAgreement") ?? bonus > 0;
-  const vars = {
-    reachedAgreement,
-    score: bonus.toFixed(2),
-    roleName: player.get("roleName") || "",
-    displayName: player.get("displayName") || "",
-  };
 
   return (
     <div className="w-full bg-gray-300 p-6 flex flex-col relative min-h-screen">
@@ -93,7 +153,7 @@ export function DebriefPanel() {
       <div className="flex-1">
         <div className="space-y-4">
           {tab.type === "notes" ? (
-            <NotesTab scenario={scenario} />
+            notes
           ) : (
             <div
               className="bg-white rounded-lg shadow-md p-6 prose prose-gray max-w-none"
@@ -110,6 +170,46 @@ export function DebriefPanel() {
         </div>
       </div>
     </div>
+  );
+}
+
+export function DebriefPanel() {
+  const player = usePlayer();
+  const players = usePlayers();
+  const game = useGame();
+
+  const tabs = normalizeTabs(game.get("debrief"));
+  const scenario = player.get("scenario") || "";
+
+  const bonus = player.get("bonus") || 0;
+  // Bonus/roleName are ordinary (game-visible) player attributes, set for
+  // everyone in the same server callback, so the other players' outcomes are
+  // readable here without any extra plumbing. Role names fall back to display
+  // names so a missing role never yields "3 points to ".
+  const others = (players || [])
+    .filter((p) => p.id !== player.id)
+    .map((p) => ({
+      roleName: p.get("roleName") || p.get("displayName") || "another player",
+      bonus: p.get("bonus") || 0,
+    }));
+
+  const vars = buildDebriefVars({
+    me: {
+      roleName: player.get("roleName"),
+      displayName: player.get("displayName"),
+      bonus,
+      // Set per-player in onStageEnded; fall back to the score for older games.
+      reachedAgreement: player.get("reachedAgreement") ?? bonus > 0,
+      roleScoresheet: player.get("roleScoresheet"),
+      finalProposal: player.get("finalProposal"),
+    },
+    others,
+    negotiationType: game.get("negotiationType"),
+    priceConfig: game.get("priceConfig"),
+  });
+
+  return (
+    <DebriefView tabs={tabs} vars={vars} notes={<NotesTab scenario={scenario} />} />
   );
 }
 

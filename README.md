@@ -932,8 +932,26 @@ A top-level `debrief` object (shared across all roles, like `tips`) supplies the
 |-------------|-----------|
 | `{{score}}` | The player's `bonus`, formatted to 2 decimals. |
 | `{{roleName}}` / `{{displayName}}` | The player's role / display name. |
+| `{{agreementDetails}}` | The agreed terms: `<strong>Price:</strong> $1,200` for price; a `<ul>` of issue → chosen option for multiple choice; a `<ul>` of the included features (or *no features included*) for features. Empty when no agreement was reached. |
+| `{{otherScores}}` | Every **other** player's points as a phrase with the "and" placed for the player count, meant to follow a comma: `…worth {{score}} points to you, {{otherScores}}.` → *and 3.00 points to Seller* (2 players) / *3.00 points to Seller, and 4.00 points to Agent* (3) / *a, b, and c* (4+). Uses role names. |
+| `{{scoreTable}}` | An HTML `<table>` of every role's points, the viewer's row marked *(you)*. |
 | `{{#agreement}}…{{/agreement}}` | Block kept only when the player reached agreement. |
 | `{{#noAgreement}}…{{/noAgreement}}` | Block kept only when no agreement was reached. |
+
+A typical Outcome tab:
+
+```html
+{{#agreement}}
+<p>The agreement you reached was:</p>
+{{agreementDetails}}
+<p>This was worth <strong>{{score}} points</strong> to you, {{otherScores}}.</p>
+{{/agreement}}
+{{#noAgreement}}
+<p>No agreement was reached, so you fall back to your BATNA, worth {{score}} points.</p>
+{{/noAgreement}}
+```
+
+**Previewing the debrief without playing a game**: run the client dev server (`cd client && npm run dev`) and open `http://localhost:8844/?debriefPreview=1`. The page renders the real Debrief stage from a pasted role JSON (or **Load scenario** by id — the dev server proxies `/api/roles` to the club, since that endpoint has no CORS). Pick which role you are, toggle agreement, set the deal, and edit each tab's HTML inline with a live re-render; scores for every role are recomputed with the same rule as the server. The draft is kept in `localStorage`; nothing is written to the club, so paste the finished HTML back into the exercise form. Alternative with no code: two browser windows on `?devKey=oandi&skipIntro=T&scenario=<id>&groupName=x`, Start in the lobby, then press **SKIP** three times (needs a fresh `empirica bundle` if running the served bundle on port 3000).
 
 The **video** is just an `<iframe>` inside an `html` tab — there is no special video field or auto-embed conversion; for a Cloudflare Stream clip use the `/<id>/iframe` player URL (not the `.m3u8` manifest) and wrap it in the responsive 16:9 `<div>` shown above. The **`notes`** tab type renders the standardized autosaving "Your Notes" component and takes no `html`.
 
@@ -990,6 +1008,7 @@ historically; they are gone, and the scenario now comes from `?scenario=`.
 | `displayName` | No | Pre-fills and auto-submits the display name step (after camera/mic permission). Use `+` or `%20` for spaces, e.g. `john+smith`. Must be 2–20 chars to auto-submit. |
 | `devKey` | No | Set to `oandi` for developer mode (auto-generates key, shows skip button) |
 | `skipIntro` | No | Set to `T` to skip all intro steps (auto-assigns random animal name) |
+| `debriefPreview` | No | Set to `1` to open the standalone Debrief preview page instead of the app (see [Debrief Block](#debrief-block)). |
 
 *`participantKey` is required unless `studentId` or `devKey=oandi` is provided. `groupName` is required but can be entered via form if not in URL.
 

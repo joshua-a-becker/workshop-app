@@ -1538,6 +1538,10 @@ Empirica.onStageEnded(({ stage }) => {
     // Persist the agreement flag per-player so the post-negotiation Debrief stage
     // can show the correct outcome without re-deriving it from the bonus.
     player.set("reachedAgreement", reachedAgreement);
+    // Stash the agreed terms too, so the Debrief stage (a separate round that
+    // can't reach this round's proposalHistory) can render them via the
+    // {{agreementDetails}} template placeholder. null when no deal was reached.
+    player.set("finalProposal", reachedAgreement ? finalProposal.options : null);
     // Stash the final-vote count too, so the Debrief stage can forward the full
     // outcome (agreement + votes + points) to the club profile (see Stage.jsx).
     player.set("voteCount", finalVoteCount);

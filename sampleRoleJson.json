@@ -1,0 +1,248 @@
+{
+  "name": "The Vacation",
+  "type": "multiple_choice",
+  "prep_time": 70,
+  "roles": [
+    {
+      "role_name": "Party A",
+      "narrative": "**Background**\n\nBack in college, you were close friends with your roommate, forming a tight bond. You made a pact at graduation to take a trip together once your lives had become settled. Now five years have passed, and that trip still hasn't happened. Of course, you're both busy, but it has also been a challenge to find something that feels exciting for both of you.\n\nYou ended up living in different cities after graduating and have since formed new social circles — despite regular visits, you can feel yourselves drifting apart. You think it is now or never: if you don't take this trip soon, you don't think you ever will. This trip is your chance to reconnect, but will only happen if you can agree on a plan.\n\nOf course you share many interests — it's why you became such good friends. You both love exploring but neither of you has travelled outside the USA. You both want to combine an exciting city nightlife scene with some quality time in nature.\n\nThe solution? Barcelona.\n\nYou have been talking for years about visiting Barcelona, a city with a vibrant night life sandwiched between mountains on one side and long beaches on the other. However, the devil is in the details.\n\n**You have identified six decision points:** room sharing, solo activities, afternoon activities, morning style, cultural activities, and the possibility of being joined by other friends. For each issue, you must choose one of three options.\n\n- **Rooms:** options are separate hotel rooms, separate bedrooms in the same apartment, or a shared room.\n- **Solo activities:** options are no planned solo time, short solo periods, or planned solo half-days.\n- **Afternoon activities:** options are one main afternoon activity, two planned afternoon activities, or a packed afternoon schedule.\n- **Mornings:** options are early starts most days, mixed mornings, or slow mornings most days.\n- **Historical and cultural tours:** options are main attractions only, some extra historical and cultural tours, or more historical and cultural tours.\n- **College friends:** options are to travel only as a pair, have old friends join for one evening, or have old friends join for several days.\n\nLife is about trade-offs. You may have to give a little to get a little, but you are confident that you can find a plan that works for both of you. As you prepare for the negotiation, reflect on your preferences for each of these issues.\n\n**Your Personal Preferences**\n\nRelaxation is your favorite part of a trip. You prefer to start your day slowly with a cup of coffee and a newspaper. You prefer to ease into the day without a clock ruining your mood. Your former roommate, in contrast, was always ready to jump into action. A mixed morning schedule would be acceptable, but early starts most days would make the trip feel much less relaxing.\n\nIn the afternoon, you absolutely need some breathing room. One main afternoon activity is great. Two activities feels busy, and a packed schedule turns the day into a checklist. This is supposed to be fun, not work.\n\nStill, you do hope to squeeze in some historical and cultural tours. They are not essential to making the trip special, but Barcelona has a rich history, and you would enjoy learning more about it. But you worry that your roommate will find tours too slow and touristy.\n\nWhen it comes to solo activities, they just defeat the purpose of a joint vacation, really. The whole point of this trip is to spend more time together!\n\nHaving other college friends join also sounds like a chore. You weren't that close, and again — this trip is supposed to be about two old roommates reconnecting. Maybe one night together could be fun.\n\nAs far as rooms go — sharing just feels right to you. You're roommates! You love those late-night conversations and small moments, and waking up together will make the trip feel like old times. Separate bedrooms in the same apartment would be OK, but separate hotel rooms would be disappointing.",
+      "BATNA": "If you cannot agree on a plan, the trip simply doesn't happen — and you may keep drifting apart. That outcome is worth 0 points.",
+      "RP": 0,
+      "scoresheet": {
+        "Rooms": [
+          {
+            "option": "Separate hotel rooms",
+            "score": -40,
+            "reason": "Disappointing — it wouldn't feel like a trip together"
+          },
+          {
+            "option": "Separate bedrooms in the same apartment",
+            "score": 10,
+            "reason": "OK as a middle ground"
+          },
+          {
+            "option": "Shared room",
+            "score": 60,
+            "reason": "Late-night conversations make it feel like old times"
+          }
+        ],
+        "Solo_Activities": [
+          {
+            "option": "No planned solo time",
+            "score": 90,
+            "reason": "The whole point of the trip is to spend more time together"
+          },
+          {
+            "option": "Short solo periods",
+            "score": 10,
+            "reason": "A small concession you can live with"
+          },
+          {
+            "option": "Planned solo half-days",
+            "score": -70,
+            "reason": "Defeats the purpose of a joint vacation"
+          }
+        ],
+        "Afternoon_Activities": [
+          {
+            "option": "One main afternoon activity",
+            "score": 135,
+            "reason": "Great — leaves the breathing room you need"
+          },
+          {
+            "option": "Two planned afternoon activities",
+            "score": 10,
+            "reason": "Feels busy, but liveable"
+          },
+          {
+            "option": "Packed afternoon schedule",
+            "score": -115,
+            "reason": "Turns the day into a checklist; this is supposed to be fun, not work"
+          }
+        ],
+        "Mornings": [
+          {
+            "option": "Early starts most days",
+            "score": -80,
+            "reason": "A clock ruining your mood every morning"
+          },
+          {
+            "option": "Mixed mornings",
+            "score": 10,
+            "reason": "Acceptable, as long as some days start slow"
+          },
+          {
+            "option": "Slow mornings most days",
+            "score": 100,
+            "reason": "Coffee, a newspaper, and no rush — your favorite part of a trip"
+          }
+        ],
+        "Historical_And_Cultural_Tours": [
+          {
+            "option": "Main attractions only",
+            "score": -40,
+            "reason": "Leaves Barcelona's rich history unexplored"
+          },
+          {
+            "option": "Some extra historical and cultural tours",
+            "score": 10,
+            "reason": "A reasonable taste of the history"
+          },
+          {
+            "option": "More historical and cultural tours",
+            "score": 60,
+            "reason": "You'd enjoy learning more about Barcelona's history"
+          }
+        ],
+        "College_Friends_Joining": [
+          {
+            "option": "Travel only as a pair",
+            "score": 60,
+            "reason": "This trip is about two old roommates reconnecting"
+          },
+          {
+            "option": "Old friends join for one evening",
+            "score": 10,
+            "reason": "Maybe one night together could be fun"
+          },
+          {
+            "option": "Old friends join for several days",
+            "score": -40,
+            "reason": "You weren't that close — it sounds like a chore"
+          }
+        ]
+      }
+    },
+    {
+      "role_name": "Party B",
+      "narrative": "**Background**\n\nBack in college, you were close friends with your roommate, forming a tight bond. You made a pact at graduation to take a trip together once your lives had become settled. Now five years have passed, and that trip still hasn't happened. Of course, you're both busy, but it has also been a challenge to find something that feels exciting for both of you.\n\nYou ended up living in different cities after graduating and have since formed new social circles — despite regular visits, you can feel yourselves drifting apart. You think it is now or never: if you don't take this trip soon, you don't think you ever will. This trip is your chance to reconnect, but will only happen if you can agree on a plan.\n\nOf course you share many interests — it's why you became such good friends. You both love exploring but neither of you has travelled outside the USA. You both want to combine an exciting city nightlife scene with some quality time in nature.\n\nThe solution? Barcelona.\n\nYou have been talking for years about visiting Barcelona, a city with a vibrant night life sandwiched between mountains on one side and long beaches on the other. However, the devil is in the details.\n\n**You have identified six decision points:** room sharing, solo activities, afternoon activities, morning style, cultural activities, and the possibility of being joined by other friends. For each issue, you must choose one of three options.\n\n- **Rooms:** options are separate hotel rooms, separate bedrooms in the same apartment, or a shared room.\n- **Solo activities:** options are no planned solo time, short solo periods, or planned solo half-days.\n- **Afternoon activities:** options are one main afternoon activity, two planned afternoon activities, or a packed afternoon schedule.\n- **Mornings:** options are early starts most days, mixed mornings, or slow mornings most days.\n- **Historical and cultural tours:** options are main attractions only, some extra historical and cultural tours, or more historical and cultural tours.\n- **College friends:** options are to travel only as a pair, have old friends join for one evening, or have old friends join for several days.\n\nLife is about trade-offs. You may have to give a little to get a little, but you are confident that you can find a plan that works for both of you. As you prepare for the negotiation, reflect on your preferences for each of these issues.\n\n**Your Personal Preferences**\n\nEven though you used to be roommates, you're not in college anymore — you want your own room. Separate bedrooms in the same apartment would be OK, but a shared room would feel too intense. As you've grown older you find that private space is important to recharging and being ready to hit the day.\n\nFor the same reason, you want some solo time built into the trip. Even a little time doing your own thing would help you reset and return feeling refreshed, but some half-days on your own would be best.\n\nYou like to make the most of your day. Your former roommate, in contrast, somehow managed to take hours just to walk out of the door on a Saturday morning! So it's important to get early starts to make the most of the trip. It would be ok to take a few slow days, but wasting every morning just lazing around would frustrate you.\n\nBy the same token, packing several activities into the afternoon makes the day feel much more satisfying to you. One main activity would feel too limited, two planned afternoon activities would be good, and a packed afternoon schedule would be best. What's the point in traveling if you're not going to see the sights?\n\nYou know this trip is supposed to be about fun, but you hope to also squeeze in some historical and cultural tours. They are not essential to making the trip special, but Barcelona has a rich history, and you would enjoy learning more about it. But, you worry that your roommate will think tours are too structured and regimented.\n\nFinally, you would enjoy inviting some old college friends — they're familiar and low-pressure, and it could be fun to relive old times. This trip will be expensive, and you want to take advantage of the chance.",
+      "BATNA": "If you cannot agree on a plan, the trip simply doesn't happen — and you may keep drifting apart. That outcome is worth 0, so only accept a plan worth more than 0 to you.",
+      "RP": 0,
+      "scoresheet": {
+        "Rooms": [
+          {
+            "option": "Separate hotel rooms",
+            "score": 90,
+            "reason": "Private space is how you recharge"
+          },
+          {
+            "option": "Separate bedrooms in the same apartment",
+            "score": 10,
+            "reason": "OK — at least a door to close"
+          },
+          {
+            "option": "Shared room",
+            "score": -70,
+            "reason": "Too intense; you're not in college anymore"
+          }
+        ],
+        "Solo_Activities": [
+          {
+            "option": "No planned solo time",
+            "score": -40,
+            "reason": "No chance to reset during the trip"
+          },
+          {
+            "option": "Short solo periods",
+            "score": 10,
+            "reason": "Even a little time on your own helps"
+          },
+          {
+            "option": "Planned solo half-days",
+            "score": 60,
+            "reason": "The best way to reset and return refreshed"
+          }
+        ],
+        "Afternoon_Activities": [
+          {
+            "option": "One main afternoon activity",
+            "score": -80,
+            "reason": "Too limited — what's the point of traveling?"
+          },
+          {
+            "option": "Two planned afternoon activities",
+            "score": 10,
+            "reason": "Good, though you'd happily fit in more"
+          },
+          {
+            "option": "Packed afternoon schedule",
+            "score": 100,
+            "reason": "The most satisfying way to see the sights"
+          }
+        ],
+        "Mornings": [
+          {
+            "option": "Early starts most days",
+            "score": 135,
+            "reason": "Out the door early, making the most of the trip"
+          },
+          {
+            "option": "Mixed mornings",
+            "score": 10,
+            "reason": "A few slow days would be ok"
+          },
+          {
+            "option": "Slow mornings most days",
+            "score": -115,
+            "reason": "Wasting every morning lazing around would frustrate you"
+          }
+        ],
+        "Historical_And_Cultural_Tours": [
+          {
+            "option": "Main attractions only",
+            "score": -40,
+            "reason": "Leaves Barcelona's rich history unexplored"
+          },
+          {
+            "option": "Some extra historical and cultural tours",
+            "score": 10,
+            "reason": "A reasonable taste of the history"
+          },
+          {
+            "option": "More historical and cultural tours",
+            "score": 60,
+            "reason": "You'd enjoy learning more about Barcelona's history"
+          }
+        ],
+        "College_Friends_Joining": [
+          {
+            "option": "Travel only as a pair",
+            "score": -40,
+            "reason": "A missed chance to relive old times"
+          },
+          {
+            "option": "Old friends join for one evening",
+            "score": 10,
+            "reason": "Better than nothing"
+          },
+          {
+            "option": "Old friends join for several days",
+            "score": 60,
+            "reason": "Familiar, low-pressure fun on an expensive trip"
+          }
+        ]
+      }
+    }
+  ],
+  "tips": "<p class=\"text-gray-700 mb-4\">In a multiple-issue negotiation, the key is to understand which issues matter most to you and which issues matter most to the other person.</p><p>Not every issue has the same value. Some issues may be highly important to one side but less important to the other. These differences create opportunities for <strong>trade-offs</strong>: you may be able to concede on a lower-priority issue in exchange for gaining more on an issue that matters more to you.</p><p>The goal is not simply to compromise equally on every issue. Instead, look for a package of choices that works well overall. A strong agreement may require giving a little on some issues so that both sides can protect what they care about most.</p>",
+  "debrief": {
+    "tabs": [
+      {
+        "name": "Outcome",
+        "html": "<h3>Negotiation Outcome</h3>\n{{#agreement}}\n<p>🎉 <strong>Congratulations — your group reached an agreement!</strong></p>\n<p>Your group agreed on a vacation plan for Barcelona.</p>\n{{/agreement}}\n{{#noAgreement}}\n<p><strong>No Agreement Reached.</strong> Your group did not reach an agreement on the vacation plan.</p>\n{{/noAgreement}}\n<p>Compare the final package of choices across the six issues. Did the agreement reflect both sides' most important priorities?</p>"
+      },
+      {
+        "name": "Discussion Questions",
+        "html": "<h3>Discussion Questions</h3>\n<p>Talk through these prompts together as a group before watching the debrief video.</p>\n<ol>\n  <li><strong>Which issues mattered most to each person?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Discuss whether you identified the other person's strongest preferences during the negotiation.</span></li>\n  <li><strong>Where did you make trade-offs?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Look at whether either side gave ground on a lower-priority issue to gain something more important elsewhere.</span></li>\n  <li><strong>Did you negotiate issue by issue, or as a package?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Discuss whether considering the six issues together helped you create a better overall plan.</span></li>\n  <li><strong>How did the relationship affect the negotiation?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Consider how the goal of reconnecting shaped what each side was willing to accept.</span></li>\n  <li><strong>What would you do differently if you negotiated this scenario again?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Be specific about what information you would ask for earlier and how you would structure your offers.</span></li>\n</ol>"
+      },
+      {
+        "name": "Debrief Video",
+        "html": "(a video will go here but we don't have them ready yet)"
+      },
+      {
+        "name": "Your Notes",
+        "type": "notes"
+      }
+    ]
+  }
+}

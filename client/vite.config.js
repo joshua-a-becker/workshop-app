@@ -1,6 +1,6 @@
 import react from "@vitejs/plugin-react";
 import builtins from "rollup-plugin-polyfill-node";
-import { defineConfig, searchForWorkspaceRoot } from "vite";
+import { defineConfig, loadEnv, searchForWorkspaceRoot } from "vite";
 import restart from "vite-plugin-restart";
 import UnoCSS from "unocss/vite";
 import dns from "dns";
@@ -13,7 +13,7 @@ const builtinsPlugin = {
 };
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     exclude: ["@empirica/tajriba", "@empirica/core"],
   },
@@ -32,6 +32,16 @@ export default defineConfig({
         // search up for workspace root
         searchForWorkspaceRoot(process.cwd()),
       ],
+    },
+    // Dev-only: the club's /api/roles has no CORS (only the Empirica server is
+    // meant to call it), so the Debrief preview page (?debriefPreview=1) loads
+    // role JSON same-origin and we forward it here. Same base-URL rule as
+    // clubApi.js: VITE_CLUB_BASE if set, else the dev club.
+    proxy: {
+      "/api/roles": {
+        target: loadEnv(mode, process.cwd(), "VITE").VITE_CLUB_BASE || "https://dev.negotiation.education",
+        changeOrigin: true,
+      },
     },
   },
   build: {
@@ -63,4 +73,4 @@ export default defineConfig({
       NODE_ENV: process.env.NODE_ENV || "development",
     },
   },
-});
+}));

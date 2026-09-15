@@ -453,14 +453,68 @@ export function ScoringCalculator({
 // Proposal contents (per type) — used by the pending card and history list.
 // ---------------------------------------------------------------------------
 
+// Resolve a proposal's options into display terms: [{ label, value, included? }].
+// Shared by ProposalDetails (React) and agreementHtml (string, for the
+// Debrief template) so the two never disagree about what a deal says.
+//   price:           one row, value = formatted price
+//   multiple_choice: one row per issue, value = chosen option's text (or "—")
+//   features:        one row per feature, included = true/false (unset = Exclude)
+export function proposalTerms(type, roleScoresheet, priceConfig, options) {
+  const opts = options || {};
+  if (type === PRICE) {
+    return [{ label: priceConfig?.label || "Price", value: formatPrice(priceConfig, opts.value) }];
+  }
+  return Object.entries(roleScoresheet || {}).map(([issue, issueOptions]) => {
+    const label = issue.replace(/_/g, " ");
+    const idx = opts[issue];
+    if (type === MULTIPLE_CHOICE) {
+      const chosen = (idx !== undefined && idx !== null) ? issueOptions[idx] : null;
+      return { label, value: chosen ? chosen.option : "—" };
+    }
+    return { label, included: (idx ?? 1) === 0 };
+  });
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// HTML-string rendering of a deal for the Debrief `html` tabs, which are
+// string templates (dangerouslySetInnerHTML) and so can't host a React
+// component. Content mirrors ProposalDetails; markup is plain so it inherits
+// the surrounding prose styles. Returns "" when there is no deal.
+export function agreementHtml(type, roleScoresheet, priceConfig, options) {
+  if (!options) return "";
+  const terms = proposalTerms(type, roleScoresheet, priceConfig, options);
+  if (type === PRICE) {
+    const t = terms[0];
+    return `<strong>${escapeHtml(t.label)}:</strong> ${escapeHtml(t.value)}`;
+  }
+  if (type === MULTIPLE_CHOICE) {
+    const items = terms.map(
+      (t) => `<li><strong>${escapeHtml(t.label)}:</strong> ${escapeHtml(t.value)}</li>`
+    );
+    return `<ul>${items.join("")}</ul>`;
+  }
+  // features: list the included ones; say so explicitly if there are none.
+  const included = terms.filter((t) => t.included).map((t) => escapeHtml(t.label));
+  if (included.length === 0) return "<em>no features included</em>";
+  return `<ul>${included.map((l) => `<li>${l}</li>`).join("")}</ul>`;
+}
+
 export function ProposalDetails({ type, roleScoresheet, priceConfig, proposal, small }) {
   const textCls = small ? "text-xs" : "text-sm";
+  const terms = proposalTerms(type, roleScoresheet, priceConfig, proposal.options);
 
   if (type === PRICE) {
     return (
       <div className={`flex items-center ${textCls}`}>
-        <span className="text-gray-700 font-semibold mr-2">{priceConfig?.label || "Price"}:</span>
-        <span className="text-gray-900 font-bold">{formatPrice(priceConfig, proposal.options?.value)}</span>
+        <span className="text-gray-700 font-semibold mr-2">{terms[0].label}:</span>
+        <span className="text-gray-900 font-bold">{terms[0].value}</span>
       </div>
     );
   }
@@ -468,16 +522,12 @@ export function ProposalDetails({ type, roleScoresheet, priceConfig, proposal, s
   if (type === MULTIPLE_CHOICE) {
     return (
       <div className="space-y-1">
-        {Object.entries(roleScoresheet || {}).map(([issue, options]) => {
-          const idx = proposal.options?.[issue];
-          const chosen = (idx !== undefined && idx !== null) ? options[idx] : null;
-          return (
-            <div key={issue} className={`flex items-center ${textCls}`}>
-              <span className="text-gray-700 font-medium mr-1">{issue.replace(/_/g, " ")}:</span>
-              <span className="text-gray-900">{chosen ? chosen.option : "—"}</span>
-            </div>
-          );
-        })}
+        {terms.map((t) => (
+          <div key={t.label} className={`flex items-center ${textCls}`}>
+            <span className="text-gray-700 font-medium mr-1">{t.label}:</span>
+            <span className="text-gray-900">{t.value}</span>
+          </div>
+        ))}
       </div>
     );
   }
@@ -486,16 +536,12 @@ export function ProposalDetails({ type, roleScoresheet, priceConfig, proposal, s
   const dotSize = small ? "w-3 h-3" : "w-4 h-4";
   return (
     <div className="space-y-1">
-      {Object.entries(roleScoresheet || {}).map(([category]) => {
-        const optionIdx = proposal.options?.[category] ?? 1;
-        const isIncluded = optionIdx === 0;
-        return (
-          <div key={category} className={`flex items-center ${textCls}`}>
-            <span className={`${dotSize} mr-2 rounded ${isIncluded ? 'bg-green-500' : 'bg-gray-300'}`}></span>
-            <span className="text-gray-700">{category.replace(/_/g, " ")}</span>
-          </div>
-        );
-      })}
+      {terms.map((t) => (
+        <div key={t.label} className={`flex items-center ${textCls}`}>
+          <span className={`${dotSize} mr-2 rounded ${t.included ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+          <span className="text-gray-700">{t.label}</span>
+        </div>
+      ))}
     </div>
   );
 }
