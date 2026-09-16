@@ -237,15 +237,15 @@
       },
       {
         "name": "Debrief Part 1",
-        "html": "<video src='https://media.negotiation.education/Vacation_Part_1_upload.mp4' controls playsinline preload='metadata'></video>"
+        "html": "<video src='https://media.negotiation.education/Vacation_Part_1_upload.mp4' controls playsinline preload='auto'></video>"
       },
       {
         "name": "Debrief Part 2",
-        "html": "<video src='https://media.negotiation.education/Vacation_Part_2_upload.mp4' controls playsinline preload='metadata'></video>"
+        "html": "<video src='https://media.negotiation.education/Vacation_Part_2_upload.mp4' controls playsinline preload='auto'></video>"
       },
       {
         "name": "Debrief Part 3",
-        "html": "<video src='https://media.negotiation.education/Vacation_Part_3_upload.mp4' controls playsinline preload='metadata'></video>"
+        "html": "<video src='https://media.negotiation.education/Vacation_Part_3_upload.mp4' controls playsinline preload='auto'></video>"
       },
       {
         "name": "Your Notes",

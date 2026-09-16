@@ -183,15 +183,29 @@ export function buildDebriefVars({ me, others, negotiationType, priceConfig }) {
   };
 }
 
-// Pure presentation: tab strip, the rendered html tab (or `notes` for a notes
+// Pure presentation: tab strip, the rendered html tabs (or `notes` for a notes
 // tab), and the Continue button. No Empirica hooks, so it can be rendered
 // standalone by the preview page.
+//
+// Every html tab stays mounted (inactive ones `hidden`) so embedded media
+// starts loading at mount rather than on first click — `<video preload>` fires
+// regardless of display. The notes tab is still mounted only while active, so
+// its autosave timing is unchanged. Switching tabs pauses any media in the tab
+// being left; position is kept, so coming back resumes where they were.
 export function DebriefView({ tabs, vars, notes }) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const contentRef = useRef(null);
   // Clamp in case the tab set ever shrinks under us.
   const index = Math.min(activeIndex, tabs.length - 1);
   const tab = tabs[index];
   const nextTab = tabs[index + 1];
+
+  const switchTo = (i) => {
+    if (contentRef.current) {
+      contentRef.current.querySelectorAll("video, audio").forEach((m) => m.pause());
+    }
+    setActiveIndex(i);
+  };
 
   return (
     <div className="w-full bg-gray-300 p-6 flex flex-col relative min-h-screen">
@@ -203,7 +217,7 @@ export function DebriefView({ tabs, vars, notes }) {
         {tabs.map((t, i) => (
           <button
             key={i}
-            onClick={() => setActiveIndex(i)}
+            onClick={() => switchTo(i)}
             className={`px-4 py-2 rounded font-medium transition-all border ${
               i === index
                 ? "bg-white text-blue-600 border-blue-400 shadow"
@@ -217,19 +231,24 @@ export function DebriefView({ tabs, vars, notes }) {
 
       {/* Tab Content */}
       <div className="flex-1">
-        <div className="space-y-4">
-          {tab.type === "notes" ? (
-            notes
-          ) : (
-            <div
-              className="bg-white rounded-lg shadow-md p-6 prose prose-gray max-w-none"
-              dangerouslySetInnerHTML={{
-                __html: renderTemplate(tab.html || "", vars),
-              }}
-            />
+        <div className="space-y-4" ref={contentRef}>
+          {tab.type === "notes" && notes}
+          {tabs.map((t, i) =>
+            t.type === "notes" ? null : (
+              <div
+                key={i}
+                // `hidden` (not display:none via style) so the space-y-4 gap
+                // rule, which skips [hidden] siblings, keeps the layout tight.
+                hidden={i !== index}
+                className="bg-white rounded-lg shadow-md p-6 prose prose-gray max-w-none"
+                dangerouslySetInnerHTML={{
+                  __html: renderTemplate(t.html || "", vars),
+                }}
+              />
+            )
           )}
           {nextTab && (
-            <ProceedButton onClick={() => setActiveIndex(index + 1)}>
+            <ProceedButton onClick={() => switchTo(index + 1)}>
               Continue to {nextTab.name}
             </ProceedButton>
           )}
