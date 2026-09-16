@@ -1,0 +1,53 @@
+{
+  "name": "The Sales Call",
+  "type": "price",
+  "prep_time": 500,
+  "price_config": {
+    "label": "Subscription Price",
+    "prefix": "£",
+    "min": 0,
+    "step": 250,
+    "description": "Agree on a single fixed price for the one-year Pareto AI subscription."
+  },
+  "roles": [
+    {
+      "role_name": "LightPay",
+      "narrative": "You are the Customer Service Department Manager at LightPay.\n\nLightPay is negotiating with Pareto AI, a customer-service automation provider. LightPay is a fast-growing UK fintech company providing digital payment and cash-flow management services to small businesses. As its customer base has grown, the volume of support enquiries has increased substantially.\n\nThe company is considering purchasing an AI-powered customer-service tool that can answer routine questions, assist customers with account and payment issues, and transfer more complex cases to a human adviser.\n\nThe proposed subscription includes all required functionality and supports up to 4,000 AI-resolved customer conversations per month. The only issue to be negotiated is the fixed price of the one-year subscription. All other contractual terms have already been agreed.\n\nYou are analytical, calm under pressure and careful about operational risk. You have been asked to control costs, but you also want a system that your team can implement successfully. You prefer cooperative business relationships, although you will not accept an agreement that cannot be justified financially.\n\nLightPay has completed trials with Pareto AI and another vendor, ResolveIQ. ResolveIQ has made a firm offer of £32,000 for a one-year subscription. The offer is valid for another seven days and provides the same usage allowance as Pareto AI.\n\nResolveIQ performed adequately during testing. However, its integration with LightPay’s existing customer-service platform would require more internal technical work. Its handover from AI to human advisers was less reliable. Its reporting and audit trail were less suitable for LightPay’s regulatory environment. Its implementation team appeared less responsive.\n\nBecause of these issues, LightPay estimates that choosing ResolveIQ would create approximately £6,000 of additional internal implementation cost, management time and operational risk. This means that although ResolveIQ’s subscription price is £32,000, its effective cost to LightPay is closer to £38,000.\n\nPareto AI performed better during the trial. Its system was easier for advisers to use, produced more consistent responses and provided clearer records of how customer enquiries had been handled. Your team also developed a good working relationship with Pareto AI’s implementation specialists.\n\nFor these reasons, you would prefer Pareto AI. Nevertheless, ResolveIQ remains a credible alternative.\n\nPareto AI has proposed an annual price of £44,000. You believe that this is too high relative to the competing offer and to your department’s budget. Your senior manager has authorized you to pay up to £38,000 and no more.\n\nYour goal is to agree on a price at or below £38,000. The lower the price, the better your outcome. You should never agree to pay more than £38,000.",
+      "BATNA": "Your best alternative is ResolveIQ. Its subscription price is £32,000, but because of additional internal implementation cost, management time and operational risk, its effective cost to LightPay is closer to £38,000. So you should never pay more than £38,000 here.",
+      "multiplier": 1,
+      "rp": 38000
+    },
+    {
+      "role_name": "Pareto AI",
+      "narrative": "You are Enterprise Account Executive at Pareto AI, an AI customer service software developer. You are negotiating the sale of your product to LightPay.\n\nLightPay is negotiating with Pareto AI, a customer-service automation provider. LightPay is a fast-growing UK fintech company providing digital payment and cash-flow management services to small businesses. As its customer base has grown, the volume of support enquiries has increased substantially.\n\nThe company is considering purchasing an AI-powered customer-service tool that can answer routine questions, assist customers with account and payment issues, and transfer more complex cases to a human adviser.\n\nThe proposed subscription includes all required functionality and supports up to 4,000 AI-resolved customer conversations per month. The only issue to be negotiated is the fixed price of the one-year subscription. All other contractual terms have already been agreed.\n\nYou are commercially disciplined and confident in Pareto AI’s product. You want to establish Pareto AI in the fintech sector, and LightPay would be a valuable client. However, you are also responsible for protecting the company’s pricing and profitability.\n\nPareto AI’s standard price for the proposed one-year subscription is £44,000.\n\nYou know that LightPay is considering another provider and that the competing offer is cheaper. However, you do not know the precise amount of that offer. You also believe that a cheaper competing product may create additional implementation costs or operational risks for LightPay.\n\nYou believe Pareto AI has several advantages over competing products in the market: faster and less resource-intensive implementation; more reliable transfer of cases to human advisers; stronger reporting and audit capabilities; better performance during LightPay’s trial; and a more experienced implementation and support team.\n\nThe lowest price you are authorised to accept is £35,000. Any agreement below that amount would provide insufficient commercial value.\n\nYou should attempt to obtain the highest possible price without losing the agreement. Your goal is to agree on a price at or above £35,000. The higher the price, the better your outcome. You should never agree to sell for less than £35,000.",
+      "BATNA": "Your lowest authorised price is £35,000. Any agreement below that amount would provide insufficient commercial value, so you should never sell for less than £35,000 here.",
+      "multiplier": -1,
+      "rp": 35000
+    }
+  ],
+  "tips": "<p class=\"text-gray-700 mb-4\">In a single-issue price negotiation, the key concepts are your <strong>reservation price</strong> and the <strong>ZOPA</strong> (Zone of Possible Agreement).</p><p>Your <strong>reservation price</strong> is the worst price you'd still accept — the point where the deal is no better than your <strong>BATNA</strong> (Best Alternative to a Negotiated Agreement). A buyer should never pay more than their reservation price; a seller should never accept less than theirs.</p><p>The <strong>ZOPA</strong> is the range of prices acceptable to both sides — it exists only when the buyer's maximum is above the seller's minimum. Any price inside the ZOPA is better than no deal for both parties; how the surplus is split is what you're negotiating over.</p><p class=\"text-gray-700 mb-4\">The number one rule still holds: <strong>never accept a deal worse than your BATNA</strong>. Here, your \"value\" is your surplus relative to your reservation price, so never accept a deal worth less than 0.</p>",
+  "debrief": {
+    "tabs": [
+      {
+        "name": "Outcome",
+        "html": "<h3>Negotiation Outcome</h3>\n{{#agreement}}\n<p>🎉 <strong>Congratulations — your group reached an agreement!</strong></p>\n<p>Your score is <strong>{{score}} points</strong>.</p>\n{{/agreement}}\n{{#noAgreement}}\n<p><strong>No Agreement Reached.</strong> Your group did not reach an agreement, so each of you falls back to your BATNA.</p>\n{{/noAgreement}}\n<p>LightPay and Pareto AI had opposite goals here — head on to the discussion questions to unpack the dynamics...</p>"
+      },
+      {
+        "name": "Discussion Questions",
+        "html": "<h3>Discussion Questions</h3>\n<p>Talk through these prompts together as a group before watching the debrief video.</p>\n<ol>\n  {{#agreement}}<li><strong>Where did the final price land within the ZOPA?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Pareto AI's reservation price was £35,000 and LightPay's was £38,000 — discuss who captured more of that £3,000 of surplus.</span></li>\n {{/agreement}}{{#noAgreement}}<li><strong>What do you think led to impasse?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">How might things have turned out differently?</span>{{/noAgreement}} <li><strong>Who made the first offer, and how aggressive was it?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Talk about whether the opening anchor pulled the final price toward the person who made it.</span></li>\n  <li><strong>Did you reveal your reservation price, intentionally or by accident?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Discuss how much information each side gave away and what it cost them.</span></li>\n  <li><strong>How did LightPay use its alternative offer from ResolveIQ?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Consider whether the alternative was presented as a credible BATNA and whether the additional implementation risk affected the negotiation.</span></li>\n  <li><strong>How did Pareto AI justify its value above a cheaper competing offer?</strong><br><span style=\"color:#4b5563;font-size:0.9em\">Discuss whether product performance, implementation quality, reporting and operational risk were used effectively in the negotiation.</span></li>\n</ol>"
+      },
+{
+        "name": "Debrief Part 1",
+        "html": "<video src='https://media.negotiation.education/Sales_Part_1_upload.mp4' controls playsinline preload='auto'></video>"
+      },
+      {
+        "name": "Debrief Part 2",
+        "html": "<video src='https://media.negotiation.education/Sales_Part_2_upload.mp4' controls playsinline preload='auto'></video>"
+      },
+      {
+        "name": "Your Notes",
+        "type": "notes"
+      }
+    ]
+  }
+}
