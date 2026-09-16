@@ -215,7 +215,12 @@ export default function DebriefPreview() {
         },
         others: roles
           .filter((r) => r !== me)
-          .map((r) => ({ roleName: r.role_name, bonus: bonusFor(r) })),
+          .map((r) => ({
+            roleName: r.role_name,
+            bonus: bonusFor(r),
+            roleScoresheet: r.scoresheet,
+            before: roles.indexOf(r) < roles.indexOf(me),
+          })),
         negotiationType: type,
         priceConfig,
       })
@@ -357,6 +362,7 @@ export default function DebriefPreview() {
               <li><code>{"{{agreementDetails}}"}</code> — the deal terms (empty if no agreement)</li>
               <li><code>{"{{otherScores}}"}</code> — "and 3.00 points to X" / "3.00 points to X, and 4.00 points to Y"</li>
               <li><code>{"{{scoreTable}}"}</code> — table of every role's points</li>
+              <li><code>{"{{scoringTable}}"}</code> — full scoresheet, one score column per role, agreed row highlighted</li>
               <li><code>{"{{#agreement}}…{{/agreement}}"}</code>, <code>{"{{#noAgreement}}…{{/noAgreement}}"}</code></li>
             </ul>
           </details>

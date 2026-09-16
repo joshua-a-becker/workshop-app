@@ -37,6 +37,10 @@ export function normalizeTabs(debrief) {
 //       write "…worth {{score}} points to you, {{otherScores}}." once and it
 //       reads correctly for 2 players or more.
 //   {{scoreTable}} — an HTML table of every role's points, viewer marked (you)
+//   {{scoringTable}} — the full scoresheet: one row per option per issue, one
+//       score column per role (viewer's headed "You:"), agreed row highlighted.
+//       Built from live player attributes, so it can't drift from the club data.
+//       Empty for price scenarios (no scoresheet).
 // Deliberately tiny — no templating dependency.
 function renderTemplate(html, vars) {
   if (!html) return "";
@@ -56,6 +60,7 @@ function renderTemplate(html, vars) {
     sub("agreementDetails", vars.agreementDetails),
     sub("otherScores", vars.otherScores),
     sub("scoreTable", vars.scoreTable),
+    sub("scoringTable", vars.scoringTable),
   ].reduce((h, f) => f(h), html);
 }
 
@@ -89,11 +94,56 @@ function scoreTableHtml(me, others) {
   return `<table><thead><tr><th>Role</th><th>Points</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+// Full scoresheet table for {{scoringTable}}. `roles` = every player in game
+// order, each { roleName, roleScoresheet, isMe }. Issues and option labels come
+// from the viewer's scoresheet; each role's score is looked up by the same
+// option index in its own sheet ("—" if it lacks that issue/option). `deal` is
+// the agreed { issue: optionIndex } map, or null when there was no agreement.
+// Styled by .debrief-scoring-table in index.css.
+function scoringTableHtml(roles, deal) {
+  const me = roles.find((r) => r.isMe);
+  const sheet = me && me.roleScoresheet;
+  if (!sheet || Object.keys(sheet).length === 0) return "";
+
+  const head = roles
+    .map(
+      (r) =>
+        `<th class="num">${r.isMe ? "You:<br>" : ""}${escapeHtml(r.roleName)}</th>`
+    )
+    .join("");
+
+  const bodies = Object.entries(sheet).map(([issue, options]) => {
+    const label = escapeHtml(issue.replace(/_/g, " "));
+    const agreedIdx = deal ? deal[issue] : undefined;
+    const rows = options.map((opt, idx) => {
+      const first =
+        idx === 0 ? `<td rowspan="${options.length}"><strong>${label}</strong></td>` : "";
+      const scores = roles
+        .map((r) => {
+          const score = r.roleScoresheet?.[issue]?.[idx]?.score;
+          return `<td class="num">${score === undefined || score === null ? "—" : escapeHtml(score)}</td>`;
+        })
+        .join("");
+      const cls = agreedIdx === idx ? ' class="agreed"' : "";
+      return `<tr${cls}>${first}<td>${escapeHtml(opt.option)}</td>${scores}</tr>`;
+    });
+    return `<tbody>${rows.join("")}</tbody>`;
+  });
+
+  return (
+    `<table class="debrief-scoring-table"><thead><tr><th>Issue</th><th>Outcome</th>${head}</tr></thead>` +
+    bodies.join("") +
+    `</table>`
+  );
+}
+
 // Build the template vars from plain data, so the Empirica-connected wrapper
 // below and the standalone preview page (DebriefPreview.jsx) go through one
 // code path and can't drift.
 //   me:     { roleName, displayName, bonus, reachedAgreement, roleScoresheet, finalProposal }
-//   others: [{ roleName, bonus }]
+//   others: [{ roleName, bonus, roleScoresheet? }] — in game order; `before`
+//           marks the ones listed ahead of the viewer so every player sees the
+//           scoring table's columns in the same order.
 export function buildDebriefVars({ me, others, negotiationType, priceConfig }) {
   const roleName = me.roleName || "";
   const bonus = me.bonus || 0;
@@ -114,6 +164,22 @@ export function buildDebriefVars({ me, others, negotiationType, priceConfig }) {
     ),
     otherScores: otherScoresPhrase(otherRows),
     scoreTable: scoreTableHtml({ roleName, score: bonus }, otherRows),
+    scoringTable: scoringTableHtml(
+      [
+        ...(others || []).filter((o) => o.before).map((o) => ({ ...o, isMe: false })),
+        { roleName, roleScoresheet: me.roleScoresheet, isMe: true },
+        ...(others || []).filter((o) => !o.before).map((o) => ({ ...o, isMe: false })),
+      ],
+      // Features: an unset issue means Exclude (index 1), as in the server's scoring.
+      me.reachedAgreement && me.finalProposal
+        ? Object.fromEntries(
+            Object.keys(me.roleScoresheet || {}).map((issue) => [
+              issue,
+              me.finalProposal[issue] ?? (negotiationType === "features" ? 1 : undefined),
+            ])
+          )
+        : null
+    ),
   };
 }
 
@@ -186,11 +252,15 @@ export function DebriefPanel() {
   // everyone in the same server callback, so the other players' outcomes are
   // readable here without any extra plumbing. Role names fall back to display
   // names so a missing role never yields "3 points to ".
-  const others = (players || [])
+  const all = players || [];
+  const myPos = all.findIndex((p) => p.id === player.id);
+  const others = all
     .filter((p) => p.id !== player.id)
     .map((p) => ({
       roleName: p.get("roleName") || p.get("displayName") || "another player",
       bonus: p.get("bonus") || 0,
+      roleScoresheet: p.get("roleScoresheet"),
+      before: all.indexOf(p) < myPos,
     }));
 
   const vars = buildDebriefVars({

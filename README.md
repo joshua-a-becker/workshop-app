@@ -935,6 +935,7 @@ A top-level `debrief` object (shared across all roles, like `tips`) supplies the
 | `{{agreementDetails}}` | The agreed terms: `<strong>Price:</strong> $1,200` for price; a `<ul>` of issue → chosen option for multiple choice; a `<ul>` of the included features (or *no features included*) for features. Empty when no agreement was reached. |
 | `{{otherScores}}` | Every **other** player's points as a phrase with the "and" placed for the player count, meant to follow a comma: `…worth {{score}} points to you, {{otherScores}}.` → *and 3.00 points to Seller* (2 players) / *3.00 points to Seller, and 4.00 points to Agent* (3) / *a, b, and c* (4+). Uses role names. |
 | `{{scoreTable}}` | An HTML `<table>` of every role's points, the viewer's row marked *(you)*. |
+| `{{scoringTable}}` | The full scoresheet as a table: one row per option per issue, one score column per role (the viewer's headed *You:*), with the agreed row highlighted in bold red. Built from the live scoresheets, so it never drifts from the club data. Empty for `price` scenarios. |
 | `{{#agreement}}…{{/agreement}}` | Block kept only when the player reached agreement. |
 | `{{#noAgreement}}…{{/noAgreement}}` | Block kept only when no agreement was reached. |
 

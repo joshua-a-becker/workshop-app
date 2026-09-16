@@ -33,3 +33,15 @@ body {
     -moz-appearance: textfield;
   }
 }
+
+/* {{scoringTable}} in the Debrief html tabs (DebriefPanel.jsx scoringTableHtml).
+   Lives inside a `prose` container, hence the !important on backgrounds. */
+.debrief-scoring-table { border-collapse: collapse; }
+.debrief-scoring-table th,
+.debrief-scoring-table td { padding: 2px 8px; border: 0; background: transparent !important; }
+.debrief-scoring-table tr { background: transparent !important; border: 0; }
+.debrief-scoring-table thead th { border-bottom: 1px solid #9ca3af; text-align: left; vertical-align: bottom; }
+.debrief-scoring-table tbody { border: 1px solid #9ca3af; }
+.debrief-scoring-table td[rowspan] { vertical-align: top; }
+.debrief-scoring-table .num { text-align: right; }
+.debrief-scoring-table tr.agreed td:not([rowspan]) { color: #0062db; font-weight: bold; }
