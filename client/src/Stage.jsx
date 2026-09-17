@@ -18,7 +18,7 @@ export function Stage({ profileComponent }) {
   const players = usePlayers();
   const stage = useStage();
   const game = useGame();
-  const { teardownCall } = useContext(DailyCallContext);
+  const { teardownCall, stopCapture } = useContext(DailyCallContext);
 
   const stageName = stage.get("name");
 
@@ -45,6 +45,15 @@ export function Stage({ profileComponent }) {
   useEffect(() => {
     if (isPrepStage) teardownCall();
   }, [isPrepStage, teardownCall]);
+
+  // The debrief keeps the live video call (VideoDebrief mounts the same
+  // InteractionPanel as the negotiation) but must not be recorded: stop the
+  // cloud recording and transcription as soon as the stage turns over. The call
+  // stays up in the same room, so nothing re-joins and nothing restarts it.
+  const isDebriefStage = stageName === "Debrief & Discussion";
+  useEffect(() => {
+    if (isDebriefStage) stopCapture();
+  }, [isDebriefStage, stopCapture]);
 
   if (player.stage.get("submit")) {
     if (players.length === 1) {

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useContext } from "react";
-import { usePlayer, usePlayers, useGame } from "@empirica/core/player/classic/react";
+import { usePlayer, usePlayers, useGame, useStage } from "@empirica/core/player/classic/react";
 import { DailyCallContext } from "../App";
 import { VolumeX, MicOff, VideoOff, Video } from "lucide-react";
 import { getTrackedUserMedia } from "../mediaTracks";
@@ -299,6 +299,7 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null, roo
   const player = usePlayer();
   const players = usePlayers();
   const game = useGame();
+  const stage = useStage();
 
   // Get Daily.co context
   const {
@@ -319,8 +320,13 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null, roo
 
   const roomUrl = roomUrlProp ?? game?.get("roomUrl");
   const meetingToken = player?.get("dailyMeetingToken");
-  // Lobby rooms are not recorded or transcribed; game rooms are.
-  const record = !game?.get("isWaiting");
+  // Lobby rooms are not recorded or transcribed; game rooms are — but only
+  // for the negotiation itself. The debrief shares the game room, and Stage.jsx
+  // stops the recording when it starts; excluding it here as well means a page
+  // refresh during the debrief (a fresh join, which is what arms recording)
+  // cannot start it back up.
+  const record =
+    !game?.get("isWaiting") && stage?.get("name") !== "Debrief & Discussion";
   const [isSelfVideoHidden, setIsSelfVideoHidden] = useState(defaultHideSelf);
 
   // Track all Daily.co participants (not just those with streams)

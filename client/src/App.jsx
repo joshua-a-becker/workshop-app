@@ -798,6 +798,19 @@ export default function App() {
         }
       };
 
+      // Room-wide recording events (Daily raises them on every participant, not
+      // just the one who called startRecording) keep isRecording truthful on all
+      // clients, the same way the transcription events below do. Without this
+      // only the first joiner's client ever knew a recording was running, so
+      // stopCapture() would have been a no-op everywhere else.
+      const handleRecordingStarted = () => {
+        setCallState((prev) => ({ ...prev, isRecording: true }));
+      };
+
+      const handleRecordingStopped = () => {
+        setCallState((prev) => ({ ...prev, isRecording: false }));
+      };
+
       const handleTranscriptionStarted = (event) => {
         // console.log("Transcription started:", event);
         setCallState((prev) => ({ ...prev, isTranscribing: true }));
@@ -849,6 +862,8 @@ export default function App() {
       callObject.on("track-started", handleTrackStarted);
       callObject.on("participant-left", handleParticipantLeft);
       callObject.on("left-meeting", handleLeftMeeting);
+      callObject.on("recording-started", handleRecordingStarted);
+      callObject.on("recording-stopped", handleRecordingStopped);
       callObject.on("transcription-started", handleTranscriptionStarted);
       callObject.on("transcription-stopped", handleTranscriptionStopped);
       callObject.on("transcription-error", handleTranscriptionError);
@@ -898,6 +913,8 @@ export default function App() {
         callObject.off("track-started", handleTrackStarted);
         callObject.off("participant-left", handleParticipantLeft);
         callObject.off("left-meeting", handleLeftMeeting);
+        callObject.off("recording-started", handleRecordingStarted);
+        callObject.off("recording-stopped", handleRecordingStopped);
         callObject.off("transcription-started", handleTranscriptionStarted);
         callObject.off("transcription-stopped", handleTranscriptionStopped);
         callObject.off("transcription-error", handleTranscriptionError);
@@ -1097,6 +1114,23 @@ export default function App() {
     }
   }, [setCallState]);
 
+  // Stop the cloud recording and transcription but keep the call itself up.
+  // Used when the "Debrief & Discussion" stage starts: the debrief runs in the
+  // same Daily room as the negotiation, so without this the raw-tracks recording
+  // started on join would simply keep rolling through the whole discussion.
+  // Idempotent: the guards make it a no-op once the room is no longer recording.
+  const stopCapture = useCallback(async () => {
+    const callObject = callObjectRef.current;
+    if (!callObject) return;
+    try {
+      if (callStateRef.current.isRecording) await callObject.stopRecording();
+    } catch (err) { console.error("stopCapture: stopRecording failed", err); }
+    try {
+      if (callStateRef.current.isTranscribing) await callObject.stopTranscription();
+    } catch (err) { console.error("stopCapture: stopTranscription failed", err); }
+    setCallState((prev) => ({ ...prev, isRecording: false, isTranscribing: false }));
+  }, []);
+
   // Fully release the Daily call AND the local getUserMedia capture. Used by the
   // prep stages (Read Negotiation Role / Ready To Negotiate), which show no video:
   // this stops the cloud recording/transcription and — by stopping the local
@@ -1186,8 +1220,9 @@ export default function App() {
     mediaLocked,
     setMediaLocked,
     teardownCall,
+    stopCapture,
     groupName, // Include groupName for child components
-  }), [mediaStream, callState, registerCallData, refreshRemoteParticipant, teardownCall, isAudioEnabled, isVideoEnabled, mediaLocked, groupName]);
+  }), [mediaStream, callState, registerCallData, refreshRemoteParticipant, teardownCall, stopCapture, isAudioEnabled, isVideoEnabled, mediaLocked, groupName]);
 
   // ============================================================================
   // CONDITIONAL RENDERING (no early returns to preserve hook order)
