@@ -1,7 +1,18 @@
 import React from "react";
+import { usePlayer } from "@empirica/core/player/classic/react";
 import { Button } from "../components/Button.jsx";
 
 export default function CustomConsent({ next, previous, index }) {
+  const player = usePlayer();
+  // Classroom mode (?classroom=true): participants must be able to opt out of
+  // research use and still proceed to the activity.
+  const classroom = new URLSearchParams(window.location.search).get("classroom") === "true";
+
+  const choose = (consent) => {
+    player.set("consent", consent);
+    next();
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 p-6">
       <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full p-10 md:p-14 border border-gray-200">
@@ -77,7 +88,9 @@ export default function CustomConsent({ next, previous, index }) {
         <div className="mt-10 pt-6 border-t-2 border-gray-300">
           <div className="bg-indigo-50 border-2 border-indigo-300 rounded-md p-6">
             <p className="text-base font-semibold text-gray-900 text-center">
-              By clicking "I Consent" below, you acknowledge that you have read and understood this consent form and agree to participate in this research study.
+              {classroom
+                ? <>Please choose below whether your data may be used for research. <br/><br/>Either way, you will proceed to the activity.</>
+                : 'By clicking "I Consent" below, you acknowledge that you have read and understood this consent form and agree to participate in this research study.'}
             </p>
           </div>
         </div>
@@ -89,9 +102,16 @@ export default function CustomConsent({ next, previous, index }) {
               <span className="text-lg px-8 py-1">Back</span>
             </Button>
           )}
-          <Button handleClick={next} autoFocus>
-            <span className="text-lg px-8 py-1">I Consent</span>
+          <Button handleClick={() => choose(true)} autoFocus>
+            <span className="text-lg px-8 py-1">
+              {classroom ? <span>Yes, use my<br/>data for research</span> : "I Consent"}
+            </span>
           </Button>
+          {classroom && (
+            <Button handleClick={() => choose(false)} primary>
+              <span className="text-lg px-8 py-1">No, do not use my<br/>data for research.</span>
+            </Button>
+          )}
         </div>
       </div>
     </div>
