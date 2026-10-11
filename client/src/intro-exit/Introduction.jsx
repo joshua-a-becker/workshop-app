@@ -24,7 +24,7 @@ export function Introduction({ next, previous, index }) {
             </p>
             <br/>
             <p className="text-base leading-relaxed">          
-              After (some mechanism TBD, currently 5 mins) you will be automatically placed into a <span className="font-semibold">video chat</span> with your negotiation group.
+              After a brief period to review your role, you will be automatically placed into a <span className="font-semibold">video chat</span> with your negotiation group.  You will continue to have access to your role materials.
             </p>
             <br/>
             <p className="text-base leading-relaxed">
@@ -35,19 +35,7 @@ export function Introduction({ next, previous, index }) {
             </p>
           </div>
 
-          <div className="bg-amber-50 border-l-4 border-amber-500 p-5 rounded-r-lg">
-            
-          
-
-          <p className="text-base leading-relaxed">
-            If you are not comfortable being on video, please close this page{/* and return the task on Prolific */}.
-          </p>
-
-          </div>
-
-          <p className="text-base leading-relaxed text-center text-gray-600 pt-4">
-            The next page will ask you to provide formal consent for your data to be used.
-          </p>
+        
         </div>
 
         <div className="mt-8 flex justify-center items-center gap-4">
@@ -57,7 +45,7 @@ export function Introduction({ next, previous, index }) {
             </Button>
           )}
           <Button handleClick={next} autoFocus>
-            <span className="text-lg px-4">Continue to Consent Form</span>
+            <span className="text-lg px-4">Continue</span>
           </Button>
         </div>
       </div>

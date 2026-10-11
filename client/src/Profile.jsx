@@ -30,7 +30,7 @@ export function Profile() {
   if (stage && stage.get("name") === "Time To Negotiate") {
     if (!isDevMode) return null;
     return (
-      <div className="w-full px-3 py-0.5 flex justify-end border-b border-gray-300">
+      <div className="w-full px-3 py-0.5 flex justify-end">
         <button
           onClick={handleSkipStage}
           className="text-white bg-red-600 px-4 py-0 text-base font-medium rounded hover:bg-red-700 transition-colors border border-red-700"
@@ -41,13 +41,17 @@ export function Profile() {
     );
   }
 
+  // The debrief bar has no bottom border.
+  const isDebrief = stage?.get("name") === "Debrief & Discussion";
+
   return (
-    <div className="w-full px-3 py-0.5 text-gray-500 grid grid-cols-3 items-center border-b border-gray-300">
-      <div className="leading-tight">
-        <div className="text-empirica-500 font-medium">
-          {stage ? stage.get("name") : ""}
-        </div>
-      </div>
+    <div
+      className={`w-full px-3 py-0.5 text-gray-500 grid grid-cols-3 items-center ${
+        isDebrief ? "" : "border-b border-gray-300"
+      }`}
+    >
+      {/* Empty left column keeps the timer centered in the 3-column grid. */}
+      <div />
 
       <Timer />
 

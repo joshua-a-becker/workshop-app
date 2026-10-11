@@ -11,6 +11,7 @@ import { DisplayNameEntry } from "./intro-exit/DisplayNameEntry.jsx";
 import { AutoPlayerIdForm } from "./intro-exit/AutoPlayerIdForm.jsx";
 import CustomConsent from './intro-exit/CustomConsent.jsx';
 import { Introduction } from './intro-exit/Introduction.jsx';
+import { IntroductionConsent } from './intro-exit/IntroductionConsent.jsx';
 import { NegotiationOutcome } from './intro-exit/NegotiationOutcome.jsx';
 import DailyIframe from "@daily-co/daily-js";
 import { CLUB_BASE, clubUid } from "./clubApi";
@@ -285,6 +286,7 @@ export default function App() {
     }
 
     introSteps.push(Introduction)
+    introSteps.push(IntroductionConsent)
     introSteps.push(CustomConsent)
     introSteps.push(DisplayNameEntry)
 

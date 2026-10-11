@@ -8,6 +8,7 @@ import {
   MULTIPLE_CHOICE,
   ProposalDetails,
   proposalValue,
+  liveValue,
   batnaThreshold,
   canSubmit,
   submitErrorMessage,
@@ -97,6 +98,8 @@ export function MaterialsPanel({
 
   // Determine what to show
   const pendingProposal = proposalState === "collecting-initial" ? currentProposal : null;
+  // The proposer auto-votes "accept" on submit, so their own proposal needs no attention cues.
+  const isOwnPending = pendingProposal?.submittedBy === player.id;
 
   // Determine if we should show the finalize modal (persist even after voting completes)
   let acceptedPendingProposal = null;
@@ -191,7 +194,7 @@ export function MaterialsPanel({
 
   // Flash the Proposals tab when there's a pending proposal
   useEffect(() => {
-    if (pendingProposal && activeTab !== "proposals") {
+    if (pendingProposal && !isOwnPending && activeTab !== "proposals") {
       const interval = setInterval(() => {
         setFlashProposalTab(prev => !prev);
       }, 1000); // Flash every second
@@ -200,7 +203,7 @@ export function MaterialsPanel({
     } else {
       setFlashProposalTab(false);
     }
-  }, [pendingProposal, activeTab]);
+  }, [pendingProposal, isOwnPending, activeTab]);
 
   // Handle tab change
   const handleTabChange = (tab) => {
@@ -223,13 +226,21 @@ export function MaterialsPanel({
       return;
     }
 
+    // Same rule as voting: you can't put forward a deal below your BATNA.
+    if (liveValue(type, role, selectedOptions, priceValue) < threshold) {
+      setSubmitErrorMsg("You can't propose a deal below your BATNA.");
+      setShowBlankProposalModal(true);
+      return;
+    }
+
     const newProposal = {
       id: `${Date.now()}-${player.id}`,
       submittedBy: player.id,
       submittedByName: player.get("displayName") || player.id,
       timestamp: Date.now(),
       options: buildProposalOptions(type, roleScoresheet, selectedOptions, priceValue),
-      initialVotes: {},
+      // Proposer automatically votes "accept" on their own proposal.
+      initialVotes: { [player.id]: "accept" },
       finalVotes: {},
       modalDismissed: {}
     };
@@ -238,10 +249,10 @@ export function MaterialsPanel({
 
   // Handle vote on proposal (initial votes)
   const handleVote = (proposalId, vote) => {
-    // If voting "accept", check the proposal isn't worth negative value to you.
+    // If voting "accept", check the proposal isn't below your BATNA.
     if (vote === "accept") {
       const proposal = history.find(p => p.id === proposalId);
-      if (proposal && proposalValue(type, role, proposal) < 0) {
+      if (proposal && proposalValue(type, role, proposal) < threshold) {
         setShowNegativePointsModal(true);
         return;
       }
@@ -325,7 +336,7 @@ export function MaterialsPanel({
           }`}
         >
           Proposals
-          {pendingProposal && (
+          {pendingProposal && !isOwnPending && (
             <span className="ml-2 inline-flex items-center justify-center w-2 h-2 bg-red-500 rounded-full"></span>
           )}
         </button>
@@ -343,7 +354,7 @@ export function MaterialsPanel({
           onClick={() => setShowQuitModal(true)}
           className="px-4 py-2 rounded font-medium transition-all border bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200 hover:border-gray-400"
         >
-          Impasse
+          Quit
         </button>
       </div>
 
@@ -419,7 +430,7 @@ export function MaterialsPanel({
               <div
                 onClick={() => setWiggleStoppedId(pendingProposal.id)}
                 className={`bg-white rounded-lg shadow-md p-6 ${
-                  wiggleStoppedId === pendingProposal.id ? "" : "animate-wiggle"
+                  isOwnPending || wiggleStoppedId === pendingProposal.id ? "" : "animate-wiggle"
                 }`}
               >
                 <div className="flex items-center justify-between mb-4">
@@ -464,9 +475,15 @@ export function MaterialsPanel({
                       {pendingProposal.initialVotes[player.id] ? (
                         <div className="text-center p-4 bg-gray-100 rounded">
                           <p className="text-sm text-gray-600">
-                            You voted: <span className="font-bold">
-                              {pendingProposal.initialVotes[player.id] === "accept" ? "✓ Accept" : "✗ Reject"}
-                            </span>
+                            {isOwnPending ? (
+                              <span className="font-bold">Your proposal</span>
+                            ) : (
+                              <>
+                                You voted: <span className="font-bold">
+                                  {pendingProposal.initialVotes[player.id] === "accept" ? "✓ Accept" : "✗ Reject"}
+                                </span>
+                              </>
+                            )}
                           </p>
                           <p className="text-xs text-gray-500 mt-1">
                             Waiting for other players... ({Object.keys(pendingProposal.initialVotes).length}/{playerCount} voted)
@@ -695,7 +712,7 @@ export function MaterialsPanel({
                 Cannot Accept Deal
               </h3>
               <p className="text-lg text-gray-700">
-                You can't accept a deal worth negative value.
+                You can't accept a deal below your BATNA.
               </p>
             </div>
             <button
@@ -855,7 +872,7 @@ export function MaterialsPanel({
                   To <strong>submit</strong> a proposal, click "Submit Proposal" in the Proposals tab.
                 </p>
                 <p>
-                  <strong>To end the negotiation without an agreement, click "impasse."</strong>
+                  <strong>To end the negotiation without an agreement, click "quit."</strong>
                 </p>
               </div>
             </div>

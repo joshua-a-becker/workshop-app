@@ -57,7 +57,7 @@ export default function CustomConsent({ next, previous, index }) {
               Safety Statement
             </h2>
             <p className="text-base ml-5">
-              This session is like a typical online classroom. You will be negotiating live with other participants and we cannot control your experience. Negotiation exercises can be challenging, and you may encounter rude or argumentative behavior.
+              This session is like a typical online MBA learning exercise. You will be negotiating live with other participants and we cannot control your experience. Negotiation exercises can be challenging, and you may encounter rude or argumentative behavior.
             </p>
           </section>
 
@@ -67,7 +67,7 @@ export default function CustomConsent({ next, previous, index }) {
               Benefits
             </h2>
             <p className="text-base ml-5">
-              By participating, you will receive practice negotiating similar to university classroom exercises.  These exercises support learning points found in the lecture videos.
+              By participating, you will receive practice negotiating similar to MBA classroom exercises.  These exercises support learning points found in the lecture videos.
             </p>
           </section>
 

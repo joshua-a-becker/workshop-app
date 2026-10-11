@@ -258,15 +258,16 @@ export function MediaPermissionGate({ children, onPermissionsGranted, storedVide
                 <li>You'll be asked to grant camera/microphone permission</li>
                 <li>You'll be able to select which camera and microphone to use</li>
                 <li>You'll see a preview of your camera</li>
+                <li>You an enable/disable video microphone.</li>
               </ol>
             </div>
-            <div className="flex gap-4 justify-end">
-              <button
+            <div className="flex gap-4 justify-center">
+              {/* <button
                 onClick={() => setShowQuitConfirmation(true)}
                 className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
               >
                 Cancel
-              </button>
+              </button> */}
               <button
                 onClick={requestInitialPermission}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -403,12 +404,12 @@ export function MediaPermissionGate({ children, onPermissionsGranted, storedVide
               </ol>
             </div>
             <div className="flex gap-4 justify-end">
-              <button
-                onClick={() => setShowQuitConfirmation(true)}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-              >
-                Quit
-              </button>
+                <button
+                  onClick={() => setShowQuitConfirmation(true)}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Quit
+                </button>
             </div>
           </div>
         </div>

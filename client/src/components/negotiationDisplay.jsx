@@ -174,7 +174,9 @@ function ChoiceRows({ roleScoresheet, selection, onSelectionChange }) {
             >
               <option value="">— Select —</option>
               {options.map((opt, i) => (
-                <option key={i} value={i}>{opt.option}</option>
+                <option key={i} value={i}>
+                  {`${opt.option} (${opt.score >= 0 ? '+' : ''}${opt.score})`}
+                </option>
               ))}
             </select>
             <span className={`text-sm font-bold flex-shrink-0 w-[80px] text-center ${

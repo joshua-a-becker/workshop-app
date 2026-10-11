@@ -46,7 +46,8 @@ export function ReadRole({ profileComponent }) {
                 Don't worry if you need more time, <strong>you'll still have this information while you negotiate.</strong>
               </p>
               <p>
-                These negotiation tips will also remain available throughout the activity.
+                If you finish early, wait for the countdown.  Consider filling out a planning doc!  (<a
+  href="https://negotiation.education/Planning_doc_template.docx" target="_blank" rel="noopener noreferrer" className="dl-link">Click for template download</a>)
               </p>
             </div>
           </div>

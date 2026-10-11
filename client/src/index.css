@@ -45,3 +45,6 @@ body {
 .debrief-scoring-table td[rowspan] { vertical-align: top; }
 .debrief-scoring-table .num { text-align: right; }
 .debrief-scoring-table tr.agreed td:not([rowspan]) { color: #0062db; font-weight: bold; }
+
+.dl-link { color: #0062db }
+.dl-link:hover { font-weight: bold; }

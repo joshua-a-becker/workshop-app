@@ -101,9 +101,13 @@ export function ReadRoleContent({ profileComponent }) {
           <p>
             Your goal is to reach an agreement that maximizes your score based on your role's scoresheet, which is shown below.
           </p><br/>
-          {/* <p>
-            Your bonus will be equal to the points you get!  1 point = $1 dollar.
-          </p> */}
+          <p>
+            To prepare most effectively, you might want to fill out a planning document.  See lectures Part 2 for details. (<a
+  href="https://negotiation.education/Planning_doc_template.docx" target="_blank" rel="noopener noreferrer" className="dl-link">Download template</a>)
+          </p><br/>
+          <p>
+            If you finish prepping early, wait for the timer to count down and your negotiation will start automatically.
+          </p><br/>
         </div>
 
           {/* 1. Narrative Section */}
