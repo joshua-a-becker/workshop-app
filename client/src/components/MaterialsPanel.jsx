@@ -45,7 +45,6 @@ export function MaterialsPanel({
   const [activeTab, setActiveTab] = useState("proposals");
   const [selectedOptions, setSelectedOptions] = useState({}); // { issue: optionIndex } (choice types)
   const [priceValue, setPriceValue] = useState(""); // string (price type)
-  const [showFinalizeModal, setShowFinalizeModal] = useState(false);
   const [showNegativePointsModal, setShowNegativePointsModal] = useState(false);
   const [showBlankProposalModal, setShowBlankProposalModal] = useState(false);
   const [submitErrorMsg, setSubmitErrorMsg] = useState("");
@@ -115,34 +114,15 @@ export function MaterialsPanel({
 
       // Show modal if:
       // - Still collecting final votes, OR
+      // - Everyone finalized (stays up until the stage ends), OR
       // - Voting complete but not unanimous finalize AND player hasn't dismissed
-      if (finalVoteCount < playerCount || (!allFinalize && !hasPlayerDismissed)) {
+      if (finalVoteCount < playerCount || allFinalize || !hasPlayerDismissed) {
         acceptedPendingProposal = currentProposal;
       }
     }
   }
 
   const allHistoryProposals = proposalState === "none" || proposalState === "complete" ? history : history.slice(0, -1);
-
-  // Auto-show finalize modal when acceptedPendingProposal exists and player hasn't voted
-  useEffect(() => {
-    if (acceptedPendingProposal && !acceptedPendingProposal.finalVotes[player.id] && !showFinalizeModal) {
-      setShowFinalizeModal(true);
-    }
-  }, [acceptedPendingProposal?.id, player.id, showFinalizeModal]);
-
-  // Check if everyone voted to finalize and submit for this player
-  useEffect(() => {
-    if (currentProposal) {
-      const finalVoteCount = Object.keys(currentProposal.finalVotes).length;
-      if (finalVoteCount === playerCount) {
-        const allFinalize = Object.values(currentProposal.finalVotes).every(v => v === "finalize");
-        if (allFinalize) {
-          player.stage.set("submit", true);
-        }
-      }
-    }
-  }, [currentProposal?.finalVotes, playerCount, player]);
 
   // Impasse countdown: driven by shared game state so every participant sees it.
   // Each client counts down locally from quitRequest.startedAt — no per-second server writes.
@@ -289,7 +269,7 @@ export function MaterialsPanel({
     proposal.finalVotes[player.id] = decision;
 
     round.set("proposalHistory", updatedHistory);
-    // useEffect will handle stage submission if everyone votes to finalize
+    // When everyone finalizes, each player clicks "Continue to debrief" to submit the stage.
   };
 
   // Handle dismissing the finalize modal
@@ -305,7 +285,6 @@ export function MaterialsPanel({
     proposal.modalDismissed[player.id] = true;
 
     round.set("proposalHistory", updatedHistory);
-    setShowFinalizeModal(false);
   };
 
   return (
@@ -602,7 +581,9 @@ export function MaterialsPanel({
       </div>
 
       {/* Finalize Modal - Popup */}
-      {showFinalizeModal && acceptedPendingProposal && (
+      {/* Open state is derived from round state (votes + modalDismissed), so it
+          survives a page refresh. */}
+      {acceptedPendingProposal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full mx-4">
             {/* Value for this player */}
@@ -621,26 +602,45 @@ export function MaterialsPanel({
                     <div className="text-center mb-6">
                       <div className="text-6xl mb-4">⏳</div>
                       <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                        Waiting for other votes...
+                        {!allVoted && "Waiting for other votes..."}
                       </h3>
                       <p className="text-lg text-gray-600 mb-4">
-                        {allVoted && !allFinalize ? (
-                          <span>Outcome: <span className="font-bold text-blue-700">Continue</span></span>
+                        {allVoted && allFinalize ? (
+                          <span>Vote result: <span className="font-bold text-green-700">agreement reached!</span></span>
+                        ) : allVoted ? (
+                          <span>Vote result: <span className="font-bold text-blue-700">continue negotiating</span></span>
                         ) : (
                           <span>You voted: <span className="font-bold text-green-700">
                             {acceptedPendingProposal.finalVotes[player.id] === "finalize" ? "Finalize" : "Continue"}
                           </span></span>
                         )}
                       </p>
-                      <div className="text-center p-4 bg-gray-100 rounded">
-                        <p className="text-4xl font-bold text-blue-600 mb-2">
-                          {finalVoteCount}/{playerCount}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          players have voted
-                        </p>
-                      </div>
+                      {!allVoted && (
+                        <div className="text-center p-4 bg-gray-100 rounded">
+                          <p className="text-4xl font-bold text-blue-600 mb-2">
+                            {finalVoteCount}/{playerCount}
+                          </p>
+                          <p className="text-sm text-gray-600">players have voted</p>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Everyone finalized: each player moves on to the debrief when ready.
+                        The stage ends once all players have clicked. */}
+                    {allFinalize && (
+                      player.stage.get("submit") ? (
+                        <p className="text-center text-sm text-gray-600">
+                          Waiting for the other players to continue...
+                        </p>
+                      ) : (
+                        <button
+                          onClick={() => player.stage.set("submit", true)}
+                          className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+                        >
+                          Continue to debrief
+                        </button>
+                      )
+                    )}
 
                     {/* Show close button if voting is complete but not unanimous */}
                     {allVoted && !allFinalize && (

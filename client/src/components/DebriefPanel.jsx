@@ -364,10 +364,11 @@ function NotesTab({ scenario }) {
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-2xl font-bold text-gray-900 mb-2">Your Notes</h3>
+        <h3 className="text-2xl font-bold text-gray-900 mb-2">Exercise Complete!</h3>
         <p className="text-gray-700 mb-4">
-          Please enter any notes you'd like to save about this exercise. Enter at
-          least 1 thing you did well, and 1 thing you'd do differently next time.
+          Enter any notes you'd like to save about this exercise. We recommend you jot down at least 1 thing you did well, and 1 thing you'd do differently next time.  Capture any learning points want to remember.
+
+          You may close this page when finished.
         </p>
 
         <textarea
