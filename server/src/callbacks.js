@@ -1466,16 +1466,16 @@ Empirica.on("player", "displayName", async (ctx, { player }) => {
 // GAME EVENTS - Existing game start logic
 // ============================================================================
 
-Empirica.onStageEnded(({ stage }) => {
-  // Score at the end of the live negotiation stage — the last stage of the
-  // Negotiation Game round — so the outcome (bonus + agreement) is on each
-  // player before the debrief exit step renders. Every other stage end is a
-  // no-op here and must NOT touch the computed bonus.
-  if (stage.get("name") !== "Time To Negotiate") {
-    return;
-  }
+// Score the negotiation from the round's proposal history and stash the
+// outcome (bonus + agreement) on every player for the debrief exit step.
+// Idempotent: runs on the FIRST "Time To Negotiate" submit (see the playerStage
+// listener below) so whoever reaches the debrief first already sees the full
+// outcome, and again from onStageEnded as a backstop. The outcome is final by
+// then: a player can only submit after a unanimous finalize ("Continue to
+// debrief") or an impasse (forceQuit auto-submits everyone, see Stage.jsx).
+function scoreNegotiation(round) {
+  if (round.get("scored")) return;
 
-  const round = stage.round;
   const game = round.currentGame;
   const history = round.get("proposalHistory") || [];
   const finalProposal = history.length > 0 ? history[history.length - 1] : null;
@@ -1555,6 +1555,30 @@ Empirica.onStageEnded(({ stage }) => {
 
   // Save whether agreement was reached to the round
   round.set("agreementReached", reachedAgreement);
+  round.set("scored", true);
+}
+
+// Each player moves on to the debrief exit step on their own, as soon as they
+// submit "Time To Negotiate" — Empirica only shows exit steps once a player has
+// `ended`, which it otherwise sets for everyone at game end (i.e. after ALL
+// players submit). Ended players also count as submitted for the stage-end
+// check, so the stage (and game) still end once the last player submits.
+Empirica.on("playerStage", "submit", (ctx, { playerStage, submit }) => {
+  if (!submit) return;
+  const stage = playerStage.stage;
+  if (stage?.get("name") !== "Time To Negotiate") return;
+  scoreNegotiation(stage.round);
+  playerStage.player.set("ended", "negotiation complete");
+  Empirica.flush();
+});
+
+Empirica.onStageEnded(({ stage }) => {
+  // Backstop for a stage that ends without every player submitting (e.g. the
+  // timer, or players offline). No-op if a submit already scored the round.
+  if (stage.get("name") !== "Time To Negotiate") {
+    return;
+  }
+  scoreNegotiation(stage.round);
   Empirica.flush();
 });
 
