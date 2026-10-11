@@ -12,7 +12,7 @@ import { AutoPlayerIdForm } from "./intro-exit/AutoPlayerIdForm.jsx";
 import CustomConsent from './intro-exit/CustomConsent.jsx';
 import { Introduction } from './intro-exit/Introduction.jsx';
 import { IntroductionConsent } from './intro-exit/IntroductionConsent.jsx';
-import { NegotiationOutcome } from './intro-exit/NegotiationOutcome.jsx';
+import { DebriefExitStep } from './intro-exit/DebriefExitStep.jsx';
 import DailyIframe from "@daily-co/daily-js";
 import { CLUB_BASE, clubUid } from "./clubApi";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -303,7 +303,7 @@ export default function App() {
 
     const exitSteps = []
 
-    exitSteps.push(NegotiationOutcome)
+    exitSteps.push(DebriefExitStep)
 
     return(exitSteps)
   }
@@ -1117,7 +1117,7 @@ export default function App() {
   }, [setCallState]);
 
   // Stop the cloud recording and transcription but keep the call itself up.
-  // Used when the "Debrief & Discussion" stage starts: the debrief runs in the
+  // Used when the debrief exit step mounts: the debrief runs in the
   // same Daily room as the negotiation, so without this the raw-tracks recording
   // started on join would simply keep rolling through the whole discussion.
   // Idempotent: the guards make it a no-op once the room is no longer recording.

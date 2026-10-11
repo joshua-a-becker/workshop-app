@@ -7,24 +7,22 @@ import {
 import { Loading } from "@empirica/core/player/react";
 import React, { useContext, useEffect } from "react";
 import { DailyCallContext } from "./App";
-import { markExerciseComplete, saveExerciseOutcome } from "./clubApi";
+import { markExerciseComplete } from "./clubApi";
 import { ReadRole } from "./components/ReadRole";
 import { ReadyToNegotiate } from "./components/ReadyToNegotiate";
 import { VideoNegotiate } from "./components/VideoNegotiate";
-import { VideoDebrief } from "./components/VideoDebrief";
 
 export function Stage({ profileComponent }) {
   const player = usePlayer();
   const players = usePlayers();
   const stage = useStage();
   const game = useGame();
-  const { teardownCall, stopCapture } = useContext(DailyCallContext);
+  const { teardownCall } = useContext(DailyCallContext);
 
   const stageName = stage.get("name");
 
   // Force submit if an impasse was declared (game force-quit). Only during the
-  // negotiation stage — forceQuit stays true afterwards, and the Debrief stage
-  // must still be sat through normally.
+  // negotiation stage.
   useEffect(() => {
     if (
       game.get("forceQuit") === true &&
@@ -45,15 +43,6 @@ export function Stage({ profileComponent }) {
   useEffect(() => {
     if (isPrepStage) teardownCall();
   }, [isPrepStage, teardownCall]);
-
-  // The debrief keeps the live video call (VideoDebrief mounts the same
-  // InteractionPanel as the negotiation) but must not be recorded: stop the
-  // cloud recording and transcription as soon as the stage turns over. The call
-  // stays up in the same room, so nothing re-joins and nothing restarts it.
-  const isDebriefStage = stageName === "Debrief & Discussion";
-  useEffect(() => {
-    if (isDebriefStage) stopCapture();
-  }, [isDebriefStage, stopCapture]);
 
   if (player.stage.get("submit")) {
     if (players.length === 1) {
@@ -98,32 +87,6 @@ export function Stage({ profileComponent }) {
 
   if (stageName === "Time To Negotiate") {
     return <VideoNegotiate profileComponent={profileComponent} />;
-  }
-
-  if (stageName === "Debrief & Discussion") {
-    // The negotiation is over and the outcome (agreement, vote count, points) was
-    // stashed on the player at the end of "Time To Negotiate" (see callbacks.js).
-    // Forward it to the signed-in member's club profile. Fire-and-forget so the
-    // debrief renders immediately; the cookie is sent so the club resolves the
-    // UID. Gate on a SUCCESSFUL response so it persists once and a failure retries
-    // on the next render (the club endpoint upserts, so any duplicate before the
-    // flag lands is harmless).
-    if (!player.get("outcomeDb")) {
-      const params = new URLSearchParams(window.location.search);
-      const scenario = player.get("scenario") || params.get("scenario");
-      const outcome = {
-        reachedAgreement: player.get("reachedAgreement") ?? false,
-        voteCount: player.get("voteCount") ?? 0,
-        pointsEarned: player.get("bonus") ?? 0,
-        jointPayoff: player.get("jointPayoff") ?? 0,
-      };
-      if (scenario) {
-        saveExerciseOutcome(scenario, outcome)
-          .then((res) => { if (res && res.ok) player.set("outcomeDb", true); })
-          .catch(() => {}); // best-effort; never block the debrief
-      }
-    }
-    return <VideoDebrief profileComponent={profileComponent} />;
   }
 
   // Default fallback

@@ -60,7 +60,7 @@ function MediaToggles({ isAudioEnabled, isVideoEnabled, onToggleAudio, onToggleV
 }
 
 // Memoized components outside the main component to prevent recreation
-const LocalVideoComponent = React.memo(({ localVideoRef, displayName, isHidden, onToggleHide, isAudioEnabled, isVideoEnabled, onToggleAudio, onToggleVideo }) => {
+const LocalVideoComponent = React.memo(({ localVideoRef, displayName, isHidden, onToggleHide, isAudioEnabled, isVideoEnabled, onToggleAudio, onToggleVideo, isWaitingForPlayer = false }) => {
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center py-1" style={TILE_STYLE}>
@@ -83,7 +83,7 @@ const LocalVideoComponent = React.memo(({ localVideoRef, displayName, isHidden, 
               <div className="flex flex-col items-center text-white">
                 {/* Camera off icon */}
                 <VideoOff className="h-5 w-5 text-white" />
-                <span className="text-sm">Camera Off</span>
+                <span className="text-sm">{isWaitingForPlayer ? "Waiting for Player Video" : "Camera Off"}</span>
               </div>
             </div>
           )}
@@ -151,12 +151,13 @@ const LocalVideoComponent = React.memo(({ localVideoRef, displayName, isHidden, 
     prevProps.onToggleHide === nextProps.onToggleHide &&
     prevProps.isAudioEnabled === nextProps.isAudioEnabled &&
     prevProps.isVideoEnabled === nextProps.isVideoEnabled &&
+    prevProps.isWaitingForPlayer === nextProps.isWaitingForPlayer &&
     prevProps.onToggleAudio === nextProps.onToggleAudio &&
     prevProps.onToggleVideo === nextProps.onToggleVideo
   );
 });
 
-const RemoteVideoComponent = React.memo(({ stream, name, sessionId, onRequestRefresh, videoState, audioState }) => {
+const RemoteVideoComponent = React.memo(({ stream, name, sessionId, onRequestRefresh, videoState, audioState, isWaitingForPlayer = false }) => {
   const ref = useRef();
   const retryCountRef = useRef(0);
   const maxRetries = 3;
@@ -212,7 +213,7 @@ const RemoteVideoComponent = React.memo(({ stream, name, sessionId, onRequestRef
               <div className="flex flex-col items-center text-white">
                 {/* Camera off icon */}
                 <VideoOff className="h-5 w-5 text-white" />
-                <span className="text-sm">Camera Off</span>
+                <span className="text-sm">{isWaitingForPlayer ? "Waiting for Player Video" : "Camera Off"}</span>
               </div>
             </div>
           )}
@@ -320,13 +321,12 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null, roo
 
   const roomUrl = roomUrlProp ?? game?.get("roomUrl");
   const meetingToken = player?.get("dailyMeetingToken");
-  // Lobby rooms are not recorded or transcribed; game rooms are — but only
-  // for the negotiation itself. The debrief shares the game room, and Stage.jsx
-  // stops the recording when it starts; excluding it here as well means a page
-  // refresh during the debrief (a fresh join, which is what arms recording)
-  // cannot start it back up.
-  const record =
-    !game?.get("isWaiting") && stage?.get("name") !== "Debrief & Discussion";
+  // Only the negotiation itself is recorded and transcribed. The lobby and the
+  // debrief exit step have no "Time To Negotiate" stage (exit steps have no stage
+  // at all), so a fresh join there — including a page refresh during the debrief,
+  // which is what arms recording — never starts it. The debrief exit step stops
+  // the recording that is already running when the game ends.
+  const record = stage?.get("name") === "Time To Negotiate";
   const [isSelfVideoHidden, setIsSelfVideoHidden] = useState(defaultHideSelf);
 
   // Track all Daily.co participants (not just those with streams)
@@ -663,6 +663,7 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null, roo
              never overwrites the toggle state, so releasing the lock restores it. */
           isAudioEnabled={isAudioEnabled && !mediaLocked}
           isVideoEnabled={isVideoEnabled && !mediaLocked}
+          isWaitingForPlayer={mediaLocked}
           onToggleAudio={toggleAudio}
           onToggleVideo={toggleVideo}
         />
@@ -674,6 +675,14 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null, roo
         const name = participantNames[sessionId] || participant.userData?.displayName || "Participant";
         const videoState = participantVideoStates[sessionId] || participant.tracks?.video?.state || "unknown";
         const audioState = participantAudioStates[sessionId] || participant.tracks?.audio?.state || "unknown";
+        // Daily's user_id is the Empirica player id (set on the meeting token).
+        // During the negotiation, a player still on the "Let's Go!" welcome modal
+        // is media-locked, which Daily reports exactly like a camera turned off.
+        const remotePlayer = players?.find((p) => p.id === participant.user_id);
+        const isWaitingForPlayer =
+          stage?.get("name") === "Time To Negotiate" &&
+          !!remotePlayer &&
+          !remotePlayer.get("hasSeenWelcomeModal");
 
         return (
           <div key={sessionId} className="min-h-0 overflow-hidden" style={tileStyle(idx + 1)}>
@@ -684,6 +693,7 @@ export function VideoChat({ defaultHideSelf = false, filterPlayerIds = null, roo
               onRequestRefresh={refreshRemoteParticipant}
               videoState={videoState}
               audioState={audioState}
+              isWaitingForPlayer={isWaitingForPlayer}
             />
           </div>
         );

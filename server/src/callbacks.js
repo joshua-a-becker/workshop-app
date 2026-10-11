@@ -1469,7 +1469,7 @@ Empirica.on("player", "displayName", async (ctx, { player }) => {
 Empirica.onStageEnded(({ stage }) => {
   // Score at the end of the live negotiation stage — the last stage of the
   // Negotiation Game round — so the outcome (bonus + agreement) is on each
-  // player before the Debrief round/stage renders. Every other stage end is a
+  // player before the debrief exit step renders. Every other stage end is a
   // no-op here and must NOT touch the computed bonus.
   if (stage.get("name") !== "Time To Negotiate") {
     return;
@@ -1499,7 +1499,7 @@ Empirica.onStageEnded(({ stage }) => {
   const negotiationType = game.get("negotiationType") || "features";
 
   // Joint payoff = sum of every player's individual bonus; accumulated as we go
-  // and stashed on each player below so the Debrief stage can forward it too.
+  // and stashed on each player below so the debrief exit step can forward it too.
   let jointPayoff = 0;
 
   // Calculate and save bonus (the negotiated "value") for each player
@@ -1535,22 +1535,22 @@ Empirica.onStageEnded(({ stage }) => {
     }
 
     player.set("bonus", bonus);
-    // Persist the agreement flag per-player so the post-negotiation Debrief stage
+    // Persist the agreement flag per-player so the post-negotiation debrief exit step
     // can show the correct outcome without re-deriving it from the bonus.
     player.set("reachedAgreement", reachedAgreement);
-    // Stash the agreed terms too, so the Debrief stage (a separate round that
-    // can't reach this round's proposalHistory) can render them via the
+    // Stash the agreed terms too, so the debrief exit step (which has no
+    // round, so can't reach this round's proposalHistory) can render them via the
     // {{agreementDetails}} template placeholder. null when no deal was reached.
     player.set("finalProposal", reachedAgreement ? finalProposal.options : null);
-    // Stash the final-vote count too, so the Debrief stage can forward the full
-    // outcome (agreement + votes + points) to the club profile (see Stage.jsx).
+    // Stash the final-vote count too, so the debrief exit step can forward the full
+    // outcome (agreement + votes + points) to the club profile (see DebriefExitStep.jsx).
     player.set("voteCount", finalVoteCount);
     jointPayoff += bonus;
     console.log(`Player ${player.id} bonus: ${bonus} (agreement: ${reachedAgreement})`);
   });
 
   // Stash the joint payoff (sum of individual bonuses) on each player now that
-  // every bonus is known, so the Debrief stage can forward it to the club.
+  // every bonus is known, so the debrief exit step can forward it to the club.
   game.players.forEach((player) => player.set("jointPayoff", jointPayoff));
 
   // Save whether agreement was reached to the round
@@ -1709,7 +1709,6 @@ function setupGameOnStart(game) {
   // Negotiation time is effectively unlimited — the impasse button (forceQuit)
   // and reaching agreement are how the stage ends, not the clock.
   const negotiateTime = 1000000;
-  const debriefTime = game.get("treatment")?.debriefTime ?? 18000;
 
 
   // Randomly assign roles to players
@@ -1769,18 +1768,9 @@ function setupGameOnStart(game) {
     duration: negotiateTime,
   });
 
-  // ROUND 2 -- Post-negotiation debrief. A separate round so the negotiation
-  // round ends first — each player's bonus is computed when the "Time To
-  // Negotiate" stage ends (onStageEnded) — before the Debrief stage renders its
-  // data-driven tabs (which can show the outcome).
-  const debriefRound = game.addRound({
-    name: "Debrief",
-  });
-
-  debriefRound.addStage({
-    name: "Debrief & Discussion",
-    duration: debriefTime,
-  });
+  // The post-negotiation debrief is an exit step (client DebriefExitStep), not a
+  // round: the game ends when "Time To Negotiate" ends, after onStageEnded has
+  // stashed each player's outcome for it.
 
   console.log("game started?")
 
