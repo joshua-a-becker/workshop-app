@@ -2,7 +2,7 @@ import { NoGameExitStep } from "./intro-exit/NoGameExitStep.jsx";
 import Finished from "./intro-exit/Finished.jsx";
 import { EmpiricaClassic } from "@empirica/core/player/classic";
 import { EmpiricaContext } from "@empirica/core/player/classic/react";
-import { EmpiricaMenu, EmpiricaParticipant } from "@empirica/core/player/react";
+import { EmpiricaParticipant } from "@empirica/core/player/react";
 import React, { useState, createContext, useEffect, useRef, useMemo, useCallback } from "react";
 import { Game } from "./Game";
 import { ConsentUrlRouter } from "./intro-exit/ConsentUrlRouter.jsx"
@@ -86,7 +86,7 @@ function GroupNameEntry({ onSubmit }) {
   );
 }
 
-export default function App() {
+function AppContent() {
   const urlParams = new URLSearchParams(window.location.search);
 
   // ============================================================================
@@ -1252,7 +1252,7 @@ export default function App() {
         <div className="text-center p-8 bg-white rounded-lg shadow-lg max-w-md">
           <h1 className="text-3xl font-bold text-red-600 mb-4">Invalid URL</h1>
           <p className="text-gray-700 mb-2">
-            We're sorry, you have reached this page via an invalid URL. Please contact the study administrator for more information.
+            We're sorry, you have reached this page via an invalid URL. Please contact the study administrator for more information. <br/><br/> <a class="dl-link" href="https://negotiation.education/feedback">Report an issue</a>.
           </p>
         </div>
       </div>
@@ -1306,7 +1306,6 @@ export default function App() {
     <EmpiricaParticipant url={url} ns={playerKey} modeFunc={EmpiricaClassic}>
       <DailyCallContext.Provider value={dailyCallContextValue}>
         <div className="relative">
-          <EmpiricaMenu position="bottom-left" />
           <div>
             <ErrorBoundary label="empirica-context">
               <EmpiricaContext playerCreate={AutoPlayerIdForm} finished={Finished}
@@ -1319,5 +1318,30 @@ export default function App() {
         </div>
       </DailyCallContext.Provider>
     </EmpiricaParticipant>
+  );
+}
+
+// "Report an Issue" link, pinned bottom-right on every page. It replaces the
+// stock Empirica menu (elephant logo). Rendered outside AppContent so it
+// also shows on the login/error gates that return before Empirica mounts.
+function ReportIssueLink() {
+  return (
+    <a
+      href="https://negotiation.education/feedback"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="fixed bottom-0 right-0 mb-2 mr-2 z-50 px-3 py-1 rounded text-sm text-gray-600 bg-gray-200/80 backdrop-blur-md hover:bg-gray-300 hover:text-gray-800"
+    >
+      ⚠️ Report an Issue
+    </a>
+  );
+}
+
+export default function App() {
+  return (
+    <>
+      <AppContent />
+      <ReportIssueLink />
+    </>
   );
 }
