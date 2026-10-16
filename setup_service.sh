@@ -28,7 +28,7 @@ StandardError=journal
 SyslogIdentifier=empirica
 
 [Install]
-WantedBy=multi-tier.target
+WantedBy=multi-user.target
 EOF
 
 # Reload systemd

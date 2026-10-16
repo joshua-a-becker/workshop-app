@@ -3,12 +3,7 @@
 # Empirica Deployment Script
 # Hard-coded for this project
 
-set -e  # Exit on any error
-
-IP_ADDRESS="142.93.41.180"
-SSH_KEY_PATH="$HOME/.ssh/id_rsa"
-BUNDLE_FILENAME="VideoChatApp.tar.zst"
-REMOTE_USER="root" 
+source ./dev_server_settings.sh
 
 # don't overwrite the remote treament [does overwrite local!]
 scp -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$REMOTE_USER@$IP_ADDRESS:/root/.empirica/treatments.yaml" .empirica/treatments.yaml
